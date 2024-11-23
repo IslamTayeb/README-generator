@@ -1,81 +1,90 @@
-'use client'
-
-import * as React from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import { ArrowRight, Github, Menu } from 'lucide-react'
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
-import { EditorView } from "@/app/_components/editor-view"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
-import { AppSidebar } from "@/app/_components/app-sidebar"
+"use client";
+import * as React from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { ArrowRight, Github, Menu } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
+import { EditorView } from "@/app/_components/editor-view";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { AppSidebar } from "@/app/_components/app-sidebar";
 
 interface Project {
-  id: string
-  name: string
-  url: string
-  lastAccessed: string
+  id: string;
+  name: string;
+  url: string;
+  lastAccessed: string;
 }
 
-const mockProjects: Project[] = [
-  {
-    id: "1",
-    name: "project-alpha",
-    url: "https://github.com/user/project-alpha",
-    lastAccessed: "2024-01-15",
-  },
-  {
-    id: "2",
-    name: "project-beta",
-    url: "https://github.com/user/project-beta",
-    lastAccessed: "2024-01-14",
-  },
-  {
-    id: "3",
-    name: "project-gamma",
-    url: "https://github.com/user/project-gamma",
-    lastAccessed: "2024-01-13",
-  },
-]
-
 export default function Dashboard() {
-  const [isAuthenticated, setIsAuthenticated] = React.useState(false)
-  const [repoUrl, setRepoUrl] = React.useState("")
-  const [isEditorMode, setIsEditorMode] = React.useState(false)
+  const [isAuthenticated, setIsAuthenticated] = React.useState(false);
+  const [repoUrl, setRepoUrl] = React.useState("");
+  const [isEditorMode, setIsEditorMode] = React.useState(false);
+  const [accessToken, setAccessToken] = React.useState<string | null>(null);
+  const [repositories, setRepositories] = React.useState<Project[]>([]);
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (repoUrl) {
-      console.log("Generating README for:", repoUrl)
-      setIsEditorMode(true)
-    } else {
-      console.error("Repository URL is required.")
-    }
-  }
-
+  // GitHub Authentication Handler
   const handleGithubAuth = () => {
-    if (!isAuthenticated) {
-      console.log("Authenticating with GitHub...")
-      setIsAuthenticated(true)
-    } else {
-      console.log("User is already authenticated. Showing repository options...")
+    window.location.href = "http://localhost:3001/auth/github/login"; // Redirect to backend for GitHub OAuth
+  };
+
+  // Fetch Repositories Handler
+  const fetchRepositories = async (token: string) => {
+    try {
+      const response = await fetch("https://api.github.com/user/repos", {
+        headers: {
+          Authorization: `token ${token}`,
+        },
+      });
+      const data = await response.json();
+      const repos = data.map((repo: any) => ({
+        id: repo.id,
+        name: repo.name,
+        url: repo.html_url,
+        lastAccessed: new Date().toISOString(),
+      }));
+      setRepositories(repos);
+    } catch (error) {
+      console.error("Failed to fetch repositories", error);
     }
-  }
+  };
+
+  React.useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get("token");
+    if (token) {
+      setIsAuthenticated(true);
+      setAccessToken(token);
+      fetchRepositories(token);
+    }
+  }, []);
 
   const navigateToLandingPage = () => {
-    setIsEditorMode(false)
-    setRepoUrl("")
-  }
+    setIsEditorMode(false);
+    setRepoUrl("");
+  };
+
+  const handleNavigateToEditor = (repoUrl: string) => {
+    setRepoUrl(repoUrl);
+    setIsEditorMode(true);
+  };
 
   return (
     <SidebarProvider defaultCollapsed={isEditorMode}>
       <div className="flex w-full bg-background text-foreground">
         <AppSidebar
           isAuthenticated={isAuthenticated}
-          projects={mockProjects}
+          projects={repositories.length ? repositories : []}
           onNewProject={navigateToLandingPage}
           onAuthenticate={handleGithubAuth}
+          onNavigateToEditor={handleNavigateToEditor}
         />
 
         <main className="flex flex-1 flex-col">
@@ -83,8 +92,10 @@ export default function Dashboard() {
             <SidebarTrigger>
               <Menu className="h-6 w-6 text-foreground" />
             </SidebarTrigger>
-            <h1 className="text-2xl font-bold text-primary">README.md Generator</h1>
-            <div className="w-6" /> {/* Placeholder for symmetry */}
+            <h1 className="text-2xl font-bold text-primary">
+              README.md Generator
+            </h1>
+            <div className="w-6" />
           </header>
 
           <AnimatePresence mode="wait">
@@ -99,10 +110,12 @@ export default function Dashboard() {
               >
                 <Card className="w-full max-w-md">
                   <CardHeader>
-                    <CardTitle className="text-center">Generate README</CardTitle>
+                    <CardTitle className="text-center">
+                      Generate README
+                    </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <form onSubmit={handleSubmit} className="space-y-4">
+                    <form onSubmit={(e) => { e.preventDefault(); setIsEditorMode(true); }} className="space-y-4">
                       <div className="relative">
                         <Input
                           type="text"
@@ -112,16 +125,6 @@ export default function Dashboard() {
                           className="pr-10 bg-input text-foreground"
                         />
                         <ArrowRight className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      </div>
-                      <div className="relative">
-                        <div className="absolute inset-0 flex items-center">
-                          <span className="w-full border-t border-border" />
-                        </div>
-                        <div className="relative flex justify-center text-xs uppercase">
-                          <span className="bg-background px-2 text-muted-foreground">
-                            Or
-                          </span>
-                        </div>
                       </div>
                       <Dialog>
                         <DialogTrigger asChild>
@@ -139,17 +142,33 @@ export default function Dashboard() {
                         <DialogContent>
                           <DialogHeader>
                             <DialogTitle>
-                              {isAuthenticated ? "Choose Repository" : "Authenticate with GitHub"}
+                              {isAuthenticated
+                                ? "Choose Repository"
+                                : "Authenticate with GitHub"}
                             </DialogTitle>
                           </DialogHeader>
                           {isAuthenticated ? (
                             <div className="py-4">
-                              {/* Add repository selection UI here */}
-                              <p>Repository selection UI goes here</p>
+                              {repositories.length ? (
+                                repositories.map((repo) => (
+                                  <Button
+                                    key={repo.id}
+                                    className="w-full mb-2"
+                                    onClick={() => handleNavigateToEditor(repo.url)}
+                                  >
+                                    {repo.name}
+                                  </Button>
+                                ))
+                              ) : (
+                                <p>Loading repositories...</p>
+                              )}
                             </div>
                           ) : (
                             <div className="py-4">
-                              <Button onClick={handleGithubAuth} className="w-full bg-primary text-primary-foreground">
+                              <Button
+                                onClick={handleGithubAuth}
+                                className="w-full bg-primary text-primary-foreground"
+                              >
                                 Authenticate with GitHub
                               </Button>
                             </div>
@@ -176,5 +195,5 @@ export default function Dashboard() {
         </main>
       </div>
     </SidebarProvider>
-  )
+  );
 }

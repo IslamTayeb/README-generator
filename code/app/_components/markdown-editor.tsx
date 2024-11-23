@@ -22,14 +22,15 @@ export function MarkdownEditor({ value, onChange }: MarkdownEditorProps) {
           options={{
             minimap: { enabled: false },
             lineNumbers: 'on',
-            glyphMargin: false,
-            folding: false,
+            glyphMargin: true,
+            folding: true,
             lineDecorationsWidth: 0,
             lineNumbersMinChars: 0,
-            renderLineHighlight: 'none',
+            renderLineHighlight: 'all',
             scrollBeyondLastLine: false,
             wordWrap: 'on',
-            padding: { top: 16, bottom: 16 },
+            padding: { top: 10, bottom: 10 },
+            fontSize: 14,
           }}
         />
       </div>

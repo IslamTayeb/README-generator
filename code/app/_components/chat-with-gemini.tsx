@@ -39,7 +39,7 @@ id: messages.length + 2,
   return (
     <div className="flex flex-col h-full bg-card">
       <h2 className="text-xl font-bold p-4 text-foreground bg-card border-b">Chat with Gemini</h2>
-      <ScrollArea className="flex-grow px-4">
+      <ScrollArea className="flex-grow px-4 bg-background">
         <div className="space-y-4 py-4">
           {messages.map((msg) => (
             <div
