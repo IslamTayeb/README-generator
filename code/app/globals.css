@@ -2,10 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  font-family: Arial, Helvetica, sans-serif;
-}
-
 @layer utilities {
   .text-balance {
     text-wrap: balance;
@@ -33,16 +29,14 @@ body {
     --destructive: 4 84% 50%;
     --destructive-foreground: 0 0% 100%;
     --ring: 0 0% 100%;
-  --radius: 0.5rem;
-    /* --section-header: 210 9.09% 10.94%; */
+    --radius: 0.5rem;
     --chat-bubble-bot: 228 6% 13%; /* lowkey somehow ended up with this from v0, my bad */
   }
-}
 
-@layer base {
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
   }

@@ -27,7 +27,6 @@ export default function Dashboard() {
   const [isAuthenticated, setIsAuthenticated] = React.useState(false);
   const [repoUrl, setRepoUrl] = React.useState("");
   const [isEditorMode, setIsEditorMode] = React.useState(false);
-  const [accessToken, setAccessToken] = React.useState<string | null>(null);
   const [repositories, setRepositories] = React.useState<Project[]>([]);
 
   // GitHub Authentication Handler
@@ -36,34 +35,50 @@ export default function Dashboard() {
   };
 
   // Fetch Repositories Handler
-  const fetchRepositories = async (token: string) => {
+  const fetchRepositories = async () => {
     try {
-      const response = await fetch("https://api.github.com/user/repos", {
-        headers: {
-          Authorization: `token ${token}`,
-        },
+      const response = await fetch("http://localhost:3001/auth/github/repos", {
+        credentials: "include", // Important to include credentials (session cookies)
       });
-      const data = await response.json();
-      const repos = data.map((repo: any) => ({
-        id: repo.id,
-        name: repo.name,
-        url: repo.html_url,
-        lastAccessed: new Date().toISOString(),
-      }));
-      setRepositories(repos);
+
+      if (response.ok) {
+        const data = await response.json();
+        const repos = data.map((repo: any) => ({
+          id: repo.id,
+          name: repo.name,
+          url: repo.html_url,
+          lastAccessed: new Date().toISOString(),
+        }));
+        setRepositories(repos);
+      } else {
+        console.error("Failed to fetch repositories");
+      }
     } catch (error) {
       console.error("Failed to fetch repositories", error);
     }
   };
 
-  React.useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const token = urlParams.get("token");
-    if (token) {
-      setIsAuthenticated(true);
-      setAccessToken(token);
-      fetchRepositories(token);
+  // Verify Authentication
+  const verifyAuthentication = async () => {
+    try {
+      const response = await fetch("http://localhost:3001/auth/github/verify", {
+        credentials: "include", // Include cookies in request
+      });
+
+      if (response.ok) {
+        setIsAuthenticated(true);
+        fetchRepositories(); // Fetch repositories after successful authentication
+      } else {
+        setIsAuthenticated(false);
+      }
+    } catch (error) {
+      console.error("Verification failed", error);
     }
+  };
+
+  // Run authentication verification on component mount
+  React.useEffect(() => {
+    verifyAuthentication();
   }, []);
 
   const navigateToLandingPage = () => {
@@ -115,7 +130,13 @@ export default function Dashboard() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <form onSubmit={(e) => { e.preventDefault(); setIsEditorMode(true); }} className="space-y-4">
+                    <form
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        setIsEditorMode(true);
+                      }}
+                      className="space-y-4"
+                    >
                       <div className="relative">
                         <Input
                           type="text"
@@ -154,7 +175,9 @@ export default function Dashboard() {
                                   <Button
                                     key={repo.id}
                                     className="w-full mb-2"
-                                    onClick={() => handleNavigateToEditor(repo.url)}
+                                    onClick={() =>
+                                      handleNavigateToEditor(repo.url)
+                                    }
                                   >
                                     {repo.name}
                                   </Button>

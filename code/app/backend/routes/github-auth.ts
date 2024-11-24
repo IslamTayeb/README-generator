@@ -1,8 +1,7 @@
-import express, { Request, Response } from "express";
+import express, { Request, Response, NextFunction } from "express";
 import axios from "axios";
 import { config } from "dotenv";
 
-// Load environment variables
 config();
 
 const router = express.Router();
@@ -18,7 +17,6 @@ router.get("/github/callback", async (req: Request, res: Response) => {
     const code = req.query.code as string;
 
     try {
-        // Exchange the authorization code for an access token
         const response = await axios.post(
             "https://github.com/login/oauth/access_token",
             {
@@ -39,10 +37,10 @@ router.get("/github/callback", async (req: Request, res: Response) => {
             throw new Error("Failed to obtain access token");
         }
 
-        // Store the access token in the session securely
-        req.session.accessToken = accessToken;
+        if (req.session) {
+            req.session.accessToken = accessToken;
+        }
 
-        // Redirect back to the main page
         res.redirect(`${process.env.FRONTEND_URL}/?authenticated=true`);
     } catch (error) {
         console.error("Error during GitHub OAuth:", error);
@@ -50,27 +48,40 @@ router.get("/github/callback", async (req: Request, res: Response) => {
     }
 });
 
+// Endpoint to verify if user is authenticated
+router.get("/github/verify", (req: Request, res: Response) => {
+    if (req.session && req.session.accessToken) {
+        res.json({ authenticated: true });
+    } else {
+        res.status(401).json({ authenticated: false });
+    }
+});
+
 // Endpoint to get repositories
-router.get("/github/repos", (req: Request, res: Response) => {
-    (async () => {
-        const accessToken = req.session.accessToken;
-
-        if (!accessToken) {
-            return res.status(401).json({ error: "User not authenticated" });
-        }
-
+router.get(
+    "/github/repos",
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
+            if (!req.session || !req.session.accessToken) {
+                res.status(401).json({ error: "User not authenticated" });
+                return; // Ensure to return so the function ends here
+            }
+
+            const accessToken = req.session.accessToken;
+
             const response = await axios.get("https://api.github.com/user/repos", {
                 headers: {
                     Authorization: `token ${accessToken}`,
                 },
             });
+
             res.json(response.data);
+            return; // Explicit return to ensure no further code is executed
         } catch (error) {
             console.error("Failed to fetch repositories:", error);
-            res.status(500).json({ error: "Failed to fetch repositories" });
+            next(error); // Use next() to handle errors properly
         }
-    })();
-});
+    }
+);
 
 export default router;
