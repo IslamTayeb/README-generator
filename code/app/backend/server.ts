@@ -4,6 +4,8 @@ import cors from "cors";
 import { config } from "dotenv";
 import githubAuthRouter from "./routes/github-auth";
 import githubCodeFetchRouter from './routes/github-code-fetch';
+import bodyParser from "body-parser";
+
 
 config();
 
@@ -38,6 +40,8 @@ app.use(express.json());
 // Use GitHub auth router for auth-related routes
 app.use("/auth", githubAuthRouter);
 app.use('/api/github', githubCodeFetchRouter);
+app.use(bodyParser.json({limit: "50mb"}));
+app.use(bodyParser.urlencoded({limit: "50mb", extended: true, parameterLimit:50000}));
 
 app.listen(PORT, () => {
   console.log(`Backend server is running on port ${PORT}`);

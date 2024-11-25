@@ -16,14 +16,16 @@ export function EditorView({ repoUrl }: { repoUrl: string }) {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0); // Progress in percentage
 
-  const loadRepository = async () => {
+  // Function to load the repository and generate README
+  const loadRepositoryAndGenerateReadme = async () => {
     try {
+      console.log("Starting repository and README loading process...");
       setLoading(true);
       setProgress(0);
 
-      // Properly encode the URL before sending to the backend
+      // Step 1: Fetch code from repository
       const encodedRepoUrl = encodeURIComponent(repoUrl);
-
+      console.log(`Fetching repository files from URL: ${repoUrl}`);
       const response = await axios.get(
         "http://localhost:3001/api/github/fetch-code",
         {
@@ -40,35 +42,50 @@ export function EditorView({ repoUrl }: { repoUrl: string }) {
         }
       );
 
-      const allFiles = response.data;
+      console.log("Repository files fetched successfully:", response.data);
 
-      // Check if allFiles is indeed an array
-      if (!Array.isArray(allFiles)) {
-        console.warn("Expected allFiles to be an array, but got:", allFiles);
-        throw new Error("Unexpected response format");
+      // Check if the response contains selected files
+      if (!response.data || !Array.isArray(response.data.selectedFiles)) {
+        console.warn("Unexpected response format. Expected selectedFiles array.");
+        throw new Error("Invalid repository files response format");
       }
 
-      // Combine all file contents into markdown format
-      const combinedContent = allFiles
-        .map(
-          (file: { filePath: string; content: string }) =>
-            `## ${file.filePath}\n\n\`\`\`\n${file.content}\n\`\`\`\n`
-        )
-        .join("\n\n");
+      const selectedFiles = response.data.selectedFiles;
 
-      setMarkdown(combinedContent);
+      // Step 2: Send the fetched files to generate README
+      console.log("Sending fetched files to /generate-readme for README generation...");
+      const generateReadmeResponse = await axios.post(
+        "http://localhost:3001/api/github/generate-readme",
+        {
+          selectedFiles,
+        },
+        {
+          withCredentials: true,
+        }
+      );
+
+      console.log("README generated successfully:", generateReadmeResponse.data);
+
+      if (!generateReadmeResponse.data || !generateReadmeResponse.data.readme) {
+        console.warn("Unexpected response format from /generate-readme.");
+        throw new Error("Invalid README generation response format");
+      }
+
+      // Step 3: Set the generated README content to the markdown editor
+      const readmeContent = generateReadmeResponse.data.readme;
+      setMarkdown(readmeContent);
     } catch (error) {
-      console.error("Failed to load repository:", error);
+      console.error("Failed to load repository or generate README:", error);
     } finally {
       setLoading(false);
       setProgress(100); // Set progress to complete when done
     }
   };
 
-  // Load the repository when the component mounts or the repoUrl changes
+  // Load the repository and generate README when the component mounts or the repoUrl changes
   useEffect(() => {
     if (repoUrl) {
-      loadRepository();
+      loadRepositoryAndGenerateReadme();
     }
   }, [repoUrl]);
 
@@ -78,7 +95,7 @@ export function EditorView({ repoUrl }: { repoUrl: string }) {
       {loading && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75">
           <div className="flex flex-col items-center space-y-4">
-            <h2 className="text-xl font-bold text-white">Loading Repository...</h2>
+            <h2 className="text-xl font-bold text-white">Loading README...</h2>
             <progress value={progress} max="100" className="w-64 h-2 bg-gray-300 rounded"></progress>
             <p className="text-white">{progress}%</p>
           </div>
@@ -90,7 +107,6 @@ export function EditorView({ repoUrl }: { repoUrl: string }) {
         className="h-[calc(100vh-4rem)]"
       >
         <ResizablePanel defaultSize={50} minSize={30}>
-          {/* Pass the repoUrl prop to MarkdownEditor */}
           <MarkdownEditor value={markdown} onChange={setMarkdown} />
         </ResizablePanel>
         <ResizableHandle />
