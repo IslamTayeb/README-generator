@@ -91,6 +91,17 @@ export default function Dashboard() {
     setIsEditorMode(true);
   };
 
+  // JSX where you render the repositories (update to match):
+  repositories.map((repo) => (
+    <Button
+      key={repo.id}
+      className="w-full mb-2"
+      onClick={() => handleNavigateToEditor(repo.url)}
+    >
+      {repo.name}
+    </Button>
+  ));
+
   return (
     <SidebarProvider defaultCollapsed={isEditorMode}>
       <div className="flex w-full bg-background text-foreground">

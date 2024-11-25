@@ -7,14 +7,15 @@ const express_1 = __importDefault(require("express"));
 const express_session_1 = __importDefault(require("express-session"));
 const cors_1 = __importDefault(require("cors"));
 const dotenv_1 = require("dotenv");
-const github_auth_1 = __importDefault(require("./routes/github-auth")); // Import the GitHub authentication router
+const github_auth_1 = __importDefault(require("./routes/github-auth"));
+const github_code_fetch_1 = __importDefault(require("./routes/github-code-fetch"));
 (0, dotenv_1.config)();
 const app = (0, express_1.default)();
 const PORT = process.env.PORT || 3001;
 // CORS configuration to allow frontend to make authenticated requests
 app.use((0, cors_1.default)({
-    origin: process.env.FRONTEND_URL, // Set this to your frontend URL
-    credentials: true, // Allow cookies to be sent
+    origin: process.env.FRONTEND_URL,
+    credentials: true,
 }));
 // Session middleware setup
 app.use((0, express_session_1.default)({
@@ -22,15 +23,16 @@ app.use((0, express_session_1.default)({
     resave: true,
     saveUninitialized: true,
     cookie: {
-        secure: false, // Should be true in production (when using HTTPS)
+        secure: false,
         httpOnly: true,
-        sameSite: "lax", // Helps with CSRF issues (adjust as needed)
+        sameSite: "lax",
     },
 }));
 // JSON parsing middleware
 app.use(express_1.default.json());
 // Use GitHub auth router for auth-related routes
 app.use("/auth", github_auth_1.default);
+app.use('/api/github', github_code_fetch_1.default);
 app.listen(PORT, () => {
     console.log(`Backend server is running on port ${PORT}`);
 });

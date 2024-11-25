@@ -2,7 +2,8 @@ import express, { Request, Response, NextFunction } from "express";
 import session from "express-session";
 import cors from "cors";
 import { config } from "dotenv";
-import githubAuthRouter from "./routes/github-auth"; // Import the GitHub authentication router
+import githubAuthRouter from "./routes/github-auth";
+import githubCodeFetchRouter from './routes/github-code-fetch';
 
 config();
 
@@ -12,8 +13,8 @@ const PORT = process.env.PORT || 3001;
 // CORS configuration to allow frontend to make authenticated requests
 app.use(
   cors({
-    origin: process.env.FRONTEND_URL, // Set this to your frontend URL
-    credentials: true, // Allow cookies to be sent
+    origin: process.env.FRONTEND_URL,
+    credentials: true,
   })
 );
 
@@ -24,9 +25,9 @@ app.use(
     resave: true,
     saveUninitialized: true,
     cookie: {
-      secure: false, // Should be true in production (when using HTTPS)
+      secure: false,
       httpOnly: true,
-      sameSite: "lax", // Helps with CSRF issues (adjust as needed)
+      sameSite: "lax",
     },
   })
 );
@@ -36,6 +37,7 @@ app.use(express.json());
 
 // Use GitHub auth router for auth-related routes
 app.use("/auth", githubAuthRouter);
+app.use('/api/github', githubCodeFetchRouter);
 
 app.listen(PORT, () => {
   console.log(`Backend server is running on port ${PORT}`);

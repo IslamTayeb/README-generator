@@ -1,19 +1,21 @@
-'use client'
+'use client';
 
-import React from 'react'
-import Editor from '@monaco-editor/react'
+import React from 'react';
+import MonacoEditor from '@monaco-editor/react';
 
 interface MarkdownEditorProps {
-  value: string
-  onChange: (value: string) => void
+  value: string;
+  onChange: (value: string) => void;
 }
 
 export function MarkdownEditor({ value, onChange }: MarkdownEditorProps) {
   return (
     <div className="flex flex-col h-full">
-      <h2 className="text-xl font-bold p-4 text-foreground border-b bg-card">Markdown IDE Editor</h2>
+      <h2 className="text-xl font-bold p-4 text-foreground border-b bg-card">
+        Markdown IDE Editor
+      </h2>
       <div className="flex-grow">
-        <Editor
+        <MonacoEditor
           height="100%"
           defaultLanguage="markdown"
           value={value}
@@ -35,5 +37,5 @@ export function MarkdownEditor({ value, onChange }: MarkdownEditorProps) {
         />
       </div>
     </div>
-  )
+  );
 }
