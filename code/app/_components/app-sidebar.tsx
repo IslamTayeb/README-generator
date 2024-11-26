@@ -110,6 +110,3 @@ export function AppSidebar({
     </Sidebar>
   );
 }
-
-// Note: Make sure to pass the `onNavigateToEditor` function as a prop to `AppSidebar`.
-// This function should handle setting the `repoUrl` and switching to the editor mode.

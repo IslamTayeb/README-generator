@@ -12,6 +12,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+// This utilizes Gemini to select the most important files from a GitHub repository to include in a README.md file. Might come in useful later, for now I want to minimize LLM usage though.
 const express_1 = __importDefault(require("express"));
 const axios_1 = __importDefault(require("axios"));
 const dotenv_1 = require("dotenv");

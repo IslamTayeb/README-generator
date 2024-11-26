@@ -23,13 +23,16 @@ export function EditorView({ repoUrl }: { repoUrl: string }) {
       setLoading(true);
       setProgress(0);
 
-      // Step 1: Fetch code from repository
+      // Step: Fetch code from repository and generate README in one go
       const encodedRepoUrl = encodeURIComponent(repoUrl);
-      console.log(`Fetching repository files from URL: ${repoUrl}`);
-      const response = await axios.get(
-        "http://localhost:3001/api/github/fetch-code",
+      console.log(`Fetching repository and generating README from URL: ${repoUrl}`);
+
+      const response = await axios.post(
+        "http://localhost:3001/api/github/fetch-and-generate-readme",
         {
-          params: { repoUrl: encodedRepoUrl },
+          repoUrl: encodedRepoUrl,
+        },
+        {
           withCredentials: true,
           onDownloadProgress: (progressEvent) => {
             if (progressEvent.total) {
@@ -42,37 +45,16 @@ export function EditorView({ repoUrl }: { repoUrl: string }) {
         }
       );
 
-      console.log("Repository files fetched successfully:", response.data);
+      console.log("README generated successfully:", response.data);
 
-      // Check if the response contains selected files
-      if (!response.data || !Array.isArray(response.data.selectedFiles)) {
-        console.warn("Unexpected response format. Expected selectedFiles array.");
-        throw new Error("Invalid repository files response format");
-      }
-
-      const selectedFiles = response.data.selectedFiles;
-
-      // Step 2: Send the fetched files to generate README
-      console.log("Sending fetched files to /generate-readme for README generation...");
-      const generateReadmeResponse = await axios.post(
-        "http://localhost:3001/api/github/generate-readme",
-        {
-          selectedFiles,
-        },
-        {
-          withCredentials: true,
-        }
-      );
-
-      console.log("README generated successfully:", generateReadmeResponse.data);
-
-      if (!generateReadmeResponse.data || !generateReadmeResponse.data.readme) {
-        console.warn("Unexpected response format from /generate-readme.");
+      // Check if the response contains the generated README content
+      if (!response.data || !response.data.readme) {
+        console.warn("Unexpected response format. Expected readme in response.");
         throw new Error("Invalid README generation response format");
       }
 
-      // Step 3: Set the generated README content to the markdown editor
-      const readmeContent = generateReadmeResponse.data.readme;
+      // Set the generated README content to the markdown editor
+      const readmeContent = response.data.readme;
       setMarkdown(readmeContent);
     } catch (error) {
       console.error("Failed to load repository or generate README:", error);

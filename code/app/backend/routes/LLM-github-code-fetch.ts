@@ -1,3 +1,4 @@
+// This utilizes Gemini to select the most important files from a GitHub repository to include in a README.md file. Might come in useful later, for now I want to minimize LLM usage though.
 import express, { Request, Response, NextFunction } from 'express';
 import axios from 'axios';
 import { config } from 'dotenv';

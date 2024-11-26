@@ -30,7 +30,7 @@ const fetchRepoTree = (owner, repo, accessToken) => __awaiter(void 0, void 0, vo
             Authorization: `Bearer ${accessToken}`,
         },
     });
-    console.log('Tree fetched successfully:', response.data.tree.length, 'files found');
+    console.log(response.data.tree);
     return response.data.tree;
 });
 // Function to fetch specific file content
@@ -80,37 +80,31 @@ const convertIpynbToMarkdown = (content) => {
 };
 // Function to determine if a file should be included
 const shouldIncludeFile = (filePath, size) => {
-    // Exclusion criteria
     const ignoredExtensions = [
-        '.pdf', '.csv', '.json', '.tsv', '.xls', '.xlsx', // document formats
-        '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', // image formats
-        '.mp4', '.avi', '.mkv', '.mov', '.webm', '.wmv', // video formats
-        '.mp3', '.wav', '.flac', // audio formats
-        '.log', '.DS_Store', // system files
+        '.pdf', '.csv', '.json', '.tsv', '.xls', '.xlsx',
+        '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp',
+        '.mp4', '.avi', '.mkv', '.mov', '.webm', '.wmv',
+        '.mp3', '.wav', '.flac',
+        '.log', '.DS_Store',
     ];
     const ignoredDirectories = ['node_modules/', 'dist/'];
-    const maxFileSize = 10000000; // 10MB limit
-    // Exclude based on extension
+    const maxFileSize = 10000000;
     if (ignoredExtensions.some(ext => filePath.endsWith(ext))) {
         console.log(`File excluded based on extension: ${filePath}`);
         return false;
     }
-    // Exclude based on directory
     if (ignoredDirectories.some(dir => filePath.includes(dir))) {
         console.log(`File excluded based on directory: ${filePath}`);
         return false;
     }
-    // Exclude large files
     if (size > maxFileSize) {
         console.log(`File excluded based on size (>10MB): ${filePath}`);
         return false;
     }
-    // Exclude data sets (files that look like datasets)
     if (filePath.includes('data') || filePath.includes('dataset')) {
         console.log(`File excluded based on data/dataset naming: ${filePath}`);
         return false;
     }
-    // If none of the exclusion criteria match, include the file
     return true;
 };
 // Optimized function to chunk content if it's too large
@@ -133,12 +127,12 @@ const chunkContent = (content, maxChunkSize = 15000) => {
     console.log(`Content chunked into ${chunks.length} parts.`);
     return chunks;
 };
-// Route to fetch code from repository
-router.get('/fetch-code', (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
+// Combined route to fetch code from repository and generate README
+router.post('/fetch-and-generate-readme', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
-        console.log('Request received for /fetch-code with repoUrl:', req.query.repoUrl);
-        let repoUrl = req.query.repoUrl;
+        console.log('Request received for /fetch-and-generate-readme with repoUrl:', req.body.repoUrl);
+        let repoUrl = req.body.repoUrl;
         if (!repoUrl) {
             res.status(400).json({ error: 'Missing repository URL' });
             return;
@@ -154,61 +148,32 @@ router.get('/fetch-code', (req, res, next) => __awaiter(void 0, void 0, void 0, 
             res.status(400).json({ error: 'Invalid repository URL format' });
             return;
         }
-        // Fetch repository tree
+        // Step 1: Fetch repository tree
         const repoTree = yield fetchRepoTree(owner, repo, accessToken);
         console.log('Fetched repository tree:', repoTree.length, 'nodes found.');
-        // Filter eligible files based on criteria
+        // Step 2: Filter eligible files based on criteria
         const eligibleFiles = repoTree.filter((node) => node.type === 'blob' && shouldIncludeFile(node.path, node.size));
         console.log('Filtered eligible files:', eligibleFiles.length, 'files selected.');
-        // Fetch content for selected files
-        const files = [];
+        // Step 3: Fetch content for selected files
+        let filesContent = '';
         for (const fileNode of eligibleFiles) {
             try {
                 console.log(`Fetching content for file: ${fileNode.path}`);
                 let content = yield fetchFileContent(owner, repo, fileNode.sha, accessToken);
-                // Handle Jupyter notebooks
                 if (fileNode.path.endsWith('.ipynb')) {
                     content = convertIpynbToMarkdown(content);
                 }
-                files.push({
-                    filePath: fileNode.path,
-                    content,
-                });
+                filesContent += `### File: ${fileNode.path}\n${content}\n\n`;
             }
             catch (err) {
                 console.warn(`Failed to fetch content for file ${fileNode.path}:`, err);
             }
         }
         console.log('All selected files fetched successfully.');
-        // Send the response
-        res.json({
-            treeAnalyzed: eligibleFiles.map(file => file.path),
-            selectedFiles: files
-        });
-    }
-    catch (error) {
-        console.error('Error fetching repository content:', error);
-        res.status(500).json({ error: 'Failed to fetch repository contents' });
-    }
-}));
-// Route to generate README.md using Gemini
-router.post('/generate-readme', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        console.log('Request received for /generate-readme with selectedFiles.');
-        const { selectedFiles } = req.body;
-        if (!selectedFiles || !Array.isArray(selectedFiles) || selectedFiles.length === 0) {
-            res.status(400).json({ error: 'Invalid input, selectedFiles is required.' });
-            return;
-        }
-        // Prepare input for Gemini
-        let filesContent = '';
-        for (const file of selectedFiles) {
-            filesContent += `### File: ${file.filePath}\n${file.content}\n\n`;
-        }
-        // Split content into chunks if necessary
+        // Step 4: Split content into chunks if necessary
         const chunks = chunkContent(filesContent);
         let fullContext = '';
-        // Process each chunk with Gemini to build context
+        // Step 5: Process each chunk with Gemini to build context
         for (const chunk of chunks) {
             console.log('Processing chunk with Gemini.');
             const analysisPrompt = `Analyze this portion of the codebase and extract key information about functionality, dependencies, and features:\n\n${chunk}`;
@@ -217,7 +182,7 @@ router.post('/generate-readme', (req, res) => __awaiter(void 0, void 0, void 0, 
             console.log('Chunk processed successfully.');
             fullContext += analysisText + '\n\n';
         }
-        // Generate final README with accumulated context
+        // Step 6: Generate final README with accumulated context
         console.log('Generating final README.md using Gemini.');
         const readmePrompt = `You are an AI assistant that creates detailed and technical README.md files for software projects.
 Based on this analysis of the project:
@@ -243,7 +208,7 @@ Format the response in proper Markdown with clear sections, code blocks where ap
         res.json({ readme: readmeContent });
     }
     catch (error) {
-        console.error('Error generating README:', error);
+        console.error('Error fetching repository content or generating README:', error);
         res.status(500).json({
             error: 'Failed to generate README.',
             details: error instanceof Error ? error.message : 'Unknown error'

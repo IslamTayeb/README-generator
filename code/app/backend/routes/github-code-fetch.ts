@@ -32,7 +32,7 @@ const fetchRepoTree = async (owner: string, repo: string, accessToken: string): 
       Authorization: `Bearer ${accessToken}`,
     },
   });
-  console.log('Tree fetched successfully:', response.data.tree.length, 'files found');
+  console.log(response.data.tree);
   return response.data.tree;
 };
 
