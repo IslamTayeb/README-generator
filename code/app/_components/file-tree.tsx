@@ -1,108 +1,114 @@
-// TODO: (1) Add a file number counter in the bottom right, (2) Make a horizontal/gray tick for when SOME of the components are selected within a parent, (3) Make it prompted before any backend processing, (3.1) Consider that you might need to make a new backend route that ONLY gets in the tree, because there will probably be an issue with the fact that you're fetching the code AND using gemini within the same route. This will be tough because of the "payload too big" error that you used to get.
+// TODO: (1) Add a file number counter in the bottom right, (2) Make a horizontal/gray tick for when SOME of the components are selected within a parent, (3) Make it prompted before any backend processing, (3.1) Consider that you might need to make a new backend route that ONLY gets in the tree, because there will probably be an issue with the fact that you're fetching the code AND using gemini within the same route. This will be tough because of the "payload too big" error that you used to get. (4) I want the control + tilde for terminal opening to be cmd + tilde.
 
-"use client";
+"use client"
 
-import * as React from "react";
-import { ChevronRight, File, Folder } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-import { cn } from "@/lib/utils";
-import { Checkbox } from "@/components/ui/checkbox";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Card } from "@/components/ui/card";
+import * as React from "react"
+import { ChevronRight, Folder, File } from 'lucide-react'
+import { motion, AnimatePresence } from "framer-motion"
+import { cn } from "@/lib/utils"
+import { Checkbox } from "@/components/ui/checkbox"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Card } from "@/components/ui/card"
 
 interface FileTreeItem {
-  path: string;
-  mode: string;
-  type: string;
-  sha: string;
-  size?: number;
-  url: string;
+  path: string
+  mode: string
+  type: string
+  sha: string
+  size?: number
+  url: string
 }
 
 interface FileTreeProps {
-  files: FileTreeItem[];
-  onSelectionChange: (selectedFiles: string[]) => void;
+  files: FileTreeItem[]
+  onSelectionChange: (selectedFiles: string[]) => void
 }
 
 interface TreeNode {
-  isFile: boolean;
-  type: string;
-  path: string;
-  children: Record<string, TreeNode>;
+  isFile: boolean
+  type: string
+  path: string
+  children: Record<string, TreeNode>
 }
 
 export function FileTree({ files, onSelectionChange }: FileTreeProps) {
-  const [selectedFiles, setSelectedFiles] = React.useState<Set<string>>(
-    new Set()
-  );
-  const [expandedFolders, setExpandedFolders] = React.useState<Set<string>>(
-    new Set()
-  );
+  const [selectedFiles, setSelectedFiles] = React.useState<Set<string>>(new Set())
+  const [expandedFolders, setExpandedFolders] = React.useState<Set<string>>(new Set())
 
   // Convert flat file list to tree structure
   const createFileTree = (files: FileTreeItem[]): Record<string, TreeNode> => {
-    const root: Record<string, TreeNode> = {};
+    const root: Record<string, TreeNode> = {}
 
-    files.forEach((file) => {
-      const parts = file.path.split("/");
-      let current = root;
+    files.forEach(file => {
+      const parts = file.path.split('/')
+      let current = root
 
       parts.forEach((part, index) => {
         if (!current[part]) {
           current[part] = {
             isFile: index === parts.length - 1,
             type: file.type,
-            path: parts.slice(0, index + 1).join("/"),
-            children: {},
-          };
+            path: parts.slice(0, index + 1).join('/'),
+            children: {}
+          }
         }
-        current = current[part].children;
-      });
-    });
+        current = current[part].children
+      })
+    })
 
-    return root;
-  };
+    return root
+  }
 
-  const fileTree = React.useMemo(() => createFileTree(files), [files]);
+  const fileTree = React.useMemo(() => createFileTree(files), [files])
 
   const handleCheckboxChange = (node: TreeNode, checked: boolean) => {
-    const newSelection = new Set(selectedFiles);
+    const newSelection = new Set(selectedFiles)
     const updateSelection = (n: TreeNode) => {
       if (checked) {
-        newSelection.add(n.path);
+        newSelection.add(n.path)
       } else {
-        newSelection.delete(n.path);
+        newSelection.delete(n.path)
       }
       if (!n.isFile) {
-        Object.values(n.children).forEach(updateSelection);
+        Object.values(n.children).forEach(updateSelection)
       }
-    };
-    updateSelection(node);
-    setSelectedFiles(newSelection);
-    onSelectionChange(Array.from(newSelection));
-  };
-
-  const isNodeChecked = (node: TreeNode): boolean => {
-    if (node.isFile) {
-      return selectedFiles.has(node.path);
     }
-    return Object.values(node.children).every(isNodeChecked);
-  };
+    updateSelection(node)
+    setSelectedFiles(newSelection)
+    onSelectionChange(Array.from(newSelection))
+  }
+
+  const getNodeState = (node: TreeNode): "checked" | "unchecked" | "indeterminate" => {
+    if (node.isFile) {
+      return selectedFiles.has(node.path) ? "checked" : "unchecked"
+    }
+
+    const childStates = Object.values(node.children).map(getNodeState)
+    const hasChecked = childStates.includes("checked")
+    const hasUnchecked = childStates.includes("unchecked")
+    const hasIndeterminate = childStates.includes("indeterminate")
+
+    if (hasIndeterminate || (hasChecked && hasUnchecked)) {
+      return "indeterminate"
+    }
+
+    return hasChecked ? "checked" : "unchecked"
+  }
 
   const toggleFolder = (path: string) => {
-    const newExpanded = new Set(expandedFolders);
+    const newExpanded = new Set(expandedFolders)
     if (newExpanded.has(path)) {
-      newExpanded.delete(path);
+      newExpanded.delete(path)
     } else {
-      newExpanded.add(path);
+      newExpanded.add(path)
     }
-    setExpandedFolders(newExpanded);
-  };
+    setExpandedFolders(newExpanded)
+  }
 
   const renderTreeNode = (node: TreeNode, name: string, level: number = 0) => {
-    const isFolder = !node.isFile;
-    const isExpanded = expandedFolders.has(node.path);
-    const isChecked = isNodeChecked(node);
+    const isFolder = !node.isFile
+    const isExpanded = expandedFolders.has(node.path)
+    const nodeState = getNodeState(node)
 
     return (
       <motion.div
@@ -113,14 +119,26 @@ export function FileTree({ files, onSelectionChange }: FileTreeProps) {
         transition={{ duration: 0.2 }}
         style={{ paddingLeft: `${level * 20}px` }}
       >
-        <div className="flex items-center gap-2 py-1 px-2 rounded-sm group hover:bg-secondary/40">
-          <Checkbox
-            checked={isChecked}
-            onCheckedChange={(checked) =>
-              handleCheckboxChange(node, checked === true)
-            }
-            className="data-[state=checked]:bg-primary data-[state=checked]:text-primary-foreground"
-          />
+        <div className={cn(
+          "flex items-center gap-2 py-1 px-2 rounded-sm group hover:bg-secondary/40",
+          nodeState === "indeterminate" && "bg-secondary/20"
+        )}>
+          <div className="relative flex items-center justify-center">
+            <Checkbox
+              checked={nodeState === "checked"}
+              onCheckedChange={(checked) => handleCheckboxChange(node, checked === true)}
+              className={cn(
+                "rounded-sm border border-primary",
+                nodeState === "checked" && "bg-primary text-primary-foreground",
+                nodeState === "indeterminate" && "bg-transparent"
+              )}
+            />
+            {nodeState === "indeterminate" && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="h-0.5 w-2/3 bg-primary rounded-full" />
+              </div>
+            )}
+          </div>
 
           {isFolder ? (
             <button
@@ -160,33 +178,40 @@ export function FileTree({ files, onSelectionChange }: FileTreeProps) {
           )}
         </AnimatePresence>
       </motion.div>
-    );
-  };
+    )
+  }
+
+  const selectedCount = Array.from(selectedFiles).filter(path => {
+    const node = files.find(file => file.path === path);
+    return node && node.type === "blob";
+  }).length;
 
   return (
     <Card className="w-full max-w-md border bg-card">
       <div className="p-4 border-b">
         <h2 className="font-semibold">Select Files for README</h2>
-        <p className="text-sm text-muted-foreground">
-          Choose which files to include in the documentation
-        </p>
+        <p className="text-sm text-muted-foreground">Choose which files to include in the documentation</p>
       </div>
-      <ScrollArea className="h-[400px] w-full">
-        <motion.div
-          className="p-2"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.3 }}
-        >
-          {Object.entries(fileTree).map(([name, node]) =>
-            renderTreeNode(node, name)
-          )}
-        </motion.div>
-      </ScrollArea>
+      <div className="relative">
+        <ScrollArea className="h-[400px] w-full">
+          <motion.div
+            className="p-2"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.3 }}
+          >
+            {Object.entries(fileTree).map(([name, node]) =>
+              renderTreeNode(node, name)
+            )}
+          </motion.div>
+        </ScrollArea>
+        <div className="absolute bottom-2 right-4 text-sm text-muted-foreground">
+          {selectedCount} file{selectedCount !== 1 ? 's' : ''} selected
+        </div>
+      </div>
     </Card>
-  );
+  )
 }
-
 
 // SAMPLE WORK FROM V0.DEV
 
