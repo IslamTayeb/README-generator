@@ -1,0 +1,678 @@
+Analyze this portion of the codebase and extract key information about functionality, dependencies, and features:
+
+### File: Code/EDA/EDA.ipynb
+# Jupyter Notebook Conversion
+```python
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+```
+
+```python
+raw_df = pd.read_csv("GSE218462_raw_counts_GRCh38.p13_NCBI.tsv", sep = '\t')
+genes_df = pd.read_csv("GSE218462_norm_counts_FPKM_GRCh38.p13_NCBI.tsv", sep = '\t')
+```
+
+```python
+raw_df
+```
+
+```python
+genes_df
+```
+
+```python
+genes = genes_df["GeneID"]
+samples = genes_df.columns
+```
+
+```python
+samples
+```
+
+```python
+raw_df2 = raw_df.T
+raw_df2
+```
+
+```python
+raw_df2.columns = raw_df2.iloc[0]
+raw_df2 = raw_df2[1:]
+```
+
+```python
+raw_df2
+```
+
+```python
+scaler = StandardScaler()
+scaled_data = scaler.fit_transform(raw_df2)
+```
+
+```python
+scaled_df = pd.DataFrame(scaled_data)
+scaled_df
+```
+
+```python
+scaled_df.columns = raw_df2.columns
+scaled_df.index = raw_df2.index
+```
+
+```python
+scaled_df
+```
+
+```python
+
+```
+
+
+
+### File: Code/EDA/LifeEdit_EDA_MZ.ipynb
+# Jupyter Notebook Conversion
+<a href="https://colab.research.google.com/github/zoraizmohammad/LifeEdit/blob/main/LifeEdit_EDA_MZ.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
+
+```python
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+```
+
+```python
+from google.colab import drive
+drive.mount('/content/drive')
+```
+
+```python
+raw_df1 = pd.read_csv("/content/drive/MyDrive/LifeEdit Personal/GSE218462_raw_counts_GRCh38.p13_NCBI.tsv", sep = '\t')
+raw_df2 = pd.read_csv("/content/drive/MyDrive/LifeEdit Personal/GSE218463_raw_counts_GRCh38.p13_NCBI.tsv", sep = '\t')
+```
+
+```python
+raw_df1
+```
+
+```python
+raw_df2
+```
+
+```python
+genes = raw_df1["GeneID"]
+samples = raw_df1.columns
+```
+
+```python
+samples
+```
+
+```python
+raw_df1_T = raw_df1.T
+raw_df1_T
+```
+
+```python
+raw_df2_T = raw_df2.T
+raw_df2_T
+```
+
+```python
+raw_df1_T.columns = raw_df1_T.iloc[0]
+raw_df1_T = raw_df1_T[1:]
+raw_df2_T.columns = raw_df2_T.iloc[0]
+raw_df2_T = raw_df2_T[1:]
+```
+
+```python
+raw_df1_T
+```
+
+```python
+raw_df2_T
+```
+
+```python
+scaler = StandardScaler()
+scaled_data1 = scaler.fit_transform(raw_df1_T)
+scaled_data2 = scaler.fit_transform(raw_df2_T)
+```
+
+```python
+scaled_df1 = pd.DataFrame(scaled_data1)
+scaled_df1
+```
+
+```python
+scaled_df2 = pd.DataFrame(scaled_data2)
+scaled_df2
+```
+
+```python
+scaled_df1.columns = raw_df1_T.columns
+scaled_df1.index = raw_df1_T.index
+```
+
+```python
+scaled_df1
+```
+
+```python
+scaled_df2.columns = raw_df2_T.columns
+scaled_df2.index = raw_df2_T.index
+```
+
+```python
+scaled_df2
+```
+
+**Checking for what columns are shared**
+
+```python
+common_columns = scaled_df1.columns.intersection(scaled_df2.columns)
+print(str(len(common_columns)) + " columns are shared")
+print("Common columns:", common_columns)
+```
+
+
+
+### File: Code/EDA/LifeEdit_EDA_MZ_Filtered.ipynb
+# Jupyter Notebook Conversion
+```python
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+```
+
+```python
+from google.colab import drive
+drive.mount('/content/drive')
+```
+
+```python
+raw_annotation = pd.read_csv("/content/drive/MyDrive/LifeEdit Personal/Human.GRCh38.p13.annot.tsv", sep = '\t')
+```
+
+```python
+raw_annotation
+```
+
+```python
+raw_df1 = pd.read_csv("/content/drive/MyDrive/LifeEdit Personal/GSE218462_raw_counts_GRCh38.p13_NCBI.tsv", sep = '\t')
+raw_df2 = pd.read_csv("/content/drive/MyDrive/LifeEdit Personal/GSE218463_raw_counts_GRCh38.p13_NCBI.tsv", sep = '\t')
+```
+
+```python
+raw_df1
+```
+
+```python
+raw_df2
+```
+
+```python
+genes = raw_df1["GeneID"]
+samples = raw_df1.columns
+```
+
+```python
+samples
+```
+
+```python
+raw_df1_T = raw_df1.T
+raw_df1_T
+```
+
+```python
+raw_df2_T = raw_df2.T
+raw_df2_T
+```
+
+```python
+raw_df1_T.columns = raw_df1_T.iloc[0]
+raw_df1_T = raw_df1_T[1:]
+raw_df2_T.columns = raw_df2_T.iloc[0]
+raw_df2_T = raw_df2_T[1:]
+```
+
+```python
+raw_df1_T
+```
+
+```python
+raw_df2_T
+```
+
+```python
+scaler = StandardScaler()
+scaled_data1 = scaler.fit_transform(raw_df1_T)
+scaled_data2 = scaler.fit_transform(raw_df2_T)
+```
+
+```python
+scaled_df1 = pd.DataFrame(scaled_data1)
+scaled_df1
+```
+
+```python
+scaled_df2 = pd.DataFrame(scaled_data2)
+scaled_df2
+```
+
+```python
+scaled_df1.columns = raw_df1_T.columns
+scaled_df1.index = raw_df1_T.index
+```
+
+```python
+scaled_df1
+```
+
+```python
+scaled_df2.columns = raw_df2_T.columns
+scaled_df2.index = raw_df2_T.index
+```
+
+```python
+scaled_df2
+```
+
+**Checking for what columns are shared**
+
+```python
+common_columns = scaled_df1.columns.intersection(scaled_df2.columns)
+print(str(len(common_columns)) + " columns are shared")
+print("Common columns:", common_columns)
+```
+
+```python
+import pandas as pd
+from sklearn.preprocessing import StandardScaler
+```
+
+###**Edited vs Unedited Processing**
+
+
+
+```python
+# Load the dataset
+df = pd.read_csv('/content/drive/MyDrive/LifeEdit Personal/GSE218462_raw_counts_GRCh38.p13_NCBI.tsv', sep='\t')
+df = df.T
+df.columns = df.iloc[0]
+df = df[1:]
+
+scaler = StandardScaler()
+scaled_data = scaler.fit_transform(df)
+scaled_df = pd.DataFrame(scaled_data)
+
+scaled_df.columns = df.columns
+scaled_df.index = df.index
+unedited = ['GSM6745632', 'GSM6745633', 'GSM6745634', 'GSM6745635', 'GSM6745636', 'GSM6745637']
+scaled_df['Edited (1) or Unedited (0)'] = scaled_df.index.map(lambda gene: 0 if gene in unedited else 1)
+mechanisms = {
+    "BE4": ["GSM6745599", "GSM6745600", "GSM6745601", "GSM6745611", "GSM6745612", "GSM6745613"],
+    "ABE8": ["GSM6745602", "GSM6745603", "GSM6745604", "GSM6745614", "GSM6745615", "GSM6745616"],
+    "Cas9": ["GSM6745605", "GSM6745606", "GSM6745607", "GSM6745617", "GSM6745618", "GSM6745619"],
+    "Utelectro": ["GSM6745608", "GSM6745609", "GSM6745610", "GSM6745620", "GSM6745621", "GSM6745622"],
+    "dCas9": ["GSM6745623", "GSM6745624", "GSM6745625"],
+    "BE4alone": ["GSM6745626", "GSM6745627", "GSM6745628"],
+    "ABE8alone": ["GSM6745629", "GSM6745630", "GSM6745631"],
+    "UT": ["GSM6745632", "GSM6745633", "GSM6745634", "GSM6745635", "GSM6745636", "GSM6745637"]
+}
+
+# Inverting the dictionary to map gene code to its corresponding key
+mechanism_map = {gene: mechanism for mechanism, genes in mechanisms.items() for gene in genes}
+
+# Adding a new column "editing mechanism" to categorize the gene codes in the index
+scaled_df['editing mechanism'] = scaled_df.index.map(mechanism_map)
+
+scaled_df
+```
+
+```python
+scaled_df['editing mechanism']
+
+```
+
+###**EDA Given Editing**
+
+```python
+# Summary statistics for edited and unedited cells
+edited_stats = scaled_df[scaled_df['Edited (1) or Unedited (0)'] == 1].describe().T
+unedited_stats = scaled_df[scaled_df['Edited (1) or Unedited (0)'] == 0].describe().T
+
+# Summary statistics for each editing mechanism
+mechanism_stats = scaled_df.groupby('editing mechanism').describe().T
+print("Edited Cells Summary:\n", edited_stats)
+print("Unedited Cells Summary:\n", unedited_stats)
+print("Mechanism-Based Summary:\n", mechanism_stats)
+
+```
+
+```python
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Select a subset of genes for visualization
+selected_genes = scaled_df.columns[:100]  # Adjust for any other set of genes if needed
+
+# Melt data for easy plotting
+melted_df = scaled_df[selected_genes].reset_index().melt(id_vars=['index'], var_name='Gene', value_name='Expression')
+melted_df['Status'] = melted_df['index'].map(lambda x: 'Edited' if scaled_df.loc[x, 'Edited (1) or Unedited (0)'] == 1 else 'Unedited')
+
+# Plot
+plt.figure(figsize=(14, 8))
+sns.boxplot(data=melted_df, x='Gene', y='Expression', hue='Status')
+plt.title("Gene Expression for Edited vs. Unedited Cells")
+plt.show()
+
+```
+
+```python
+# Select a subset of genes
+selected_genes = scaled_df.columns[:10]
+
+# Plot histograms for each gene by editing mechanism
+for gene in selected_genes:
+    plt.figure(figsize=(10, 6))
+    sns.histplot(data=scaled_df, x=gene, hue='editing mechanism', kde=True, element="step")
+    plt.title(f"Expression Distribution of {gene} by Editing Mechanism")
+    plt.xlabel("Expression Level")
+    plt.ylabel("Frequency")
+    plt.show()
+
+```
+
+```python
+# Calculate average expression per mechanism
+avg_expression_by_mechanism = scaled_df.groupby('editing mechanism').mean().T[selected_genes]
+
+# Plot
+avg_expression_by_mechanism.plot(kind='bar', figsize=(14, 8))
+plt.title("Average Gene Expression per Editing Mechanism")
+plt.xlabel("Gene")
+plt.ylabel("Average Expression")
+plt.show()
+
+```
+
+```python
+# Correlation matrices for edited and unedited cells
+edited_corr = scaled_df[scaled_df['Edited (1) or Unedited (0)'] == 1][selected_genes].corr()
+unedited_corr = scaled_df[scaled_df['Edited (1) or Unedited (0)'] == 0][selected_genes].corr()
+
+# Heatmap for correlations
+plt.figure(figsize=(12, 6))
+sns.heatmap(edited_corr, annot=True, cmap='coolwarm')
+plt.title("Correlation Matrix for Edited Cells")
+plt.show()
+
+plt.figure(figsize=(12, 6))
+sns.heatmap(unedited_corr, annot=True, cmap='coolwarm')
+plt.title("Correlation Matrix for Unedited Cells")
+plt.show()
+
+```
+
+```python
+from sklearn.decomposition import PCA
+
+# Perform PCA
+pca = PCA(n_components=2)
+pca_result = pca.fit_transform(scaled_df[selected_genes])
+pca_df = pd.DataFrame(pca_result, columns=['PCA1', 'PCA2'], index=scaled_df.index)
+pca_df['Mechanism'] = scaled_df['editing mechanism']
+
+# Plot PCA
+plt.figure(figsize=(10, 6))
+sns.scatterplot(data=pca_df, x='PCA1', y='PCA2', hue='Mechanism', palette="viridis")
+plt.title("PCA of Gene Expression by Editing Mechanism")
+plt.xlabel("Principal Component 1")
+plt.ylabel("Principal Component 2")
+plt.show()
+
+```
+
+```python
+from scipy.stats import ttest_ind
+
+# Conduct T-tests for selected genes between edited and unedited cells
+t_test_results = {}
+for gene in selected_genes:
+    edited_expression = scaled_df[scaled_df['Edited (1) or Unedited (0)'] == 1][gene]
+    unedited_expression = scaled_df[scaled_df['Edited (1) or Unedited (0)'] == 0][gene]
+    t_stat, p_val = ttest_ind(edited_expression, unedited_expression)
+    t_test_results[gene] = (t_stat, p_val)
+
+print("T-test Results (t-statistic, p-value):\n", t_test_results)
+
+```
+
+```python
+from sklearn.cluster import KMeans
+
+# Apply K-means clustering
+kmeans = KMeans(n_clusters=3)  # Adjust clusters as needed
+cluster_labels = kmeans.fit_predict(scaled_df[selected_genes])
+
+# Add cluster labels to DataFrame
+scaled_df['Cluster'] = cluster_labels
+
+# Plot cluster distribution
+plt.figure(figsize=(10, 6))
+sns.scatterplot(data=pca_df, x='PCA1', y='PCA2', hue=scaled_df['Cluster'], palette="deep")
+plt.title("K-means Clustering of Gene Expression")
+plt.xlabel("Principal Component 1")
+plt.ylabel("Principal Component 2")
+plt.show()
+
+```
+
+```python
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+# Select a subset of genes
+subset_genes = scaled_df.columns[:20]  # Select first 20 genes for example
+
+# Create a heatmap of gene expressions across editing mechanisms
+plt.figure(figsize=(15, 10))
+sns.heatmap(scaled_df.groupby('editing mechanism')[subset_genes].mean(), cmap='viridis', annot=True, fmt=".2f")
+plt.title("Average Gene Expression Across Editing Mechanisms")
+plt.xlabel("Gene")
+plt.ylabel("Editing Mechanism")
+plt.show()
+
+```
+
+```python
+from sklearn.decomposition import PCA
+import numpy as np
+
+# Perform PCA on selected genes
+pca = PCA(n_components=2)
+pca.fit(scaled_df[selected_genes])
+
+# Get loadings (contributions) of each gene to the principal components
+loadings = pd.DataFrame(pca.components_.T, index=selected_genes, columns=['PC1', 'PC2'])
+top_genes_pc1 = loadings['PC1'].abs().nlargest(10).index
+top_genes_pc2 = loadings['PC2'].abs().nlargest(10).index
+
+print("Top Gene Contributors to PC1 (Edited vs. Unedited Differences):", top_genes_pc1)
+print("Top Gene Contributors to PC2 (Mechanism-Specific Differences):", top_genes_pc2)
+
+```
+
+```python
+# Plot distribution of expression levels for selected genes across mechanisms
+plt.figure(figsize=(14, 8))
+for gene in selected_genes[:5]:  # Limiting to 5 genes for clarity
+    plt.figure(figsize=(10, 6))
+    sns.violinplot(data=scaled_df, x='editing mechanism', y=gene, palette='Set2')
+    plt.title(f"Distribution of Expression Levels for {gene} Across Mechanisms")
+    plt.xlabel("Editing Mechanism")
+    plt.ylabel("Expression Level")
+    plt.show()
+
+```
+
+```python
+from scipy.cluster.hierarchy import dendrogram, linkage
+
+# Perform hierarchical clustering
+linked = linkage(scaled_df[selected_genes].T, method='ward')
+plt.figure(figsize=(12, 8))
+dendrogram(linked, labels=selected_genes, leaf_rotation=90)
+plt.title("Hierarchical Clustering of Genes")
+plt.xlabel("Gene")
+plt.ylabel("Distance")
+plt.show()
+
+```
+
+```python
+# Calculate variance of gene expressions across mechanisms
+variance_df = scaled_df.groupby('editing mechanism')[selected_genes].var().T
+variance_df.plot(kind='bar', figsize=(14, 8), legend=False)
+plt.title("Gene Expression Variability Across Mechanisms")
+plt.xlabel("Gene")
+plt.ylabel("Variance")
+plt.show()
+
+```
+
+```python
+from sklearn.cluster import KMeans
+
+# Perform K-means clustering on genes across mechanisms
+kmeans = KMeans(n_clusters=4, random_state=0)
+kmeans_labels = kmeans.fit_predict(scaled_df[selected_genes])
+
+# Assign clusters to the DataFrame for plotting
+scaled_df['KMeans Cluster'] = kmeans_labels
+
+# Plot PCA with K-means clusters
+pca = PCA(n_components=2)
+pca_result = pca.fit_transform(scaled_df[selected_genes])
+pca_df = pd.DataFrame(pca_result, columns=['PCA1', 'PCA2'], index=scaled_df.index)
+pca_df['Cluster'] = kmeans_labels
+
+plt.figure(figsize=(10, 6))
+sns.scatterplot(data=pca_df, x='PCA1', y='PCA2', hue='Cluster', palette='deep')
+plt.title("K-means Clustering of Gene Expression Profiles by Mechanism")
+plt.xlabel("Principal Component 1")
+plt.ylabel("Principal Component 2")
+plt.show()
+
+```
+
+```python
+
+```
+
+
+
+### File: Code/EDA/LifeEdit_EDA_SJ.ipynb
+# Jupyter Notebook Conversion
+```python
+!pip install -U kaleido
+```
+
+```python
+%matplotlib inline
+```
+
+```python
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.preprocessing import StandardScaler
+```
+
+```python
+raw_df1 = pd.read_csv("/content/GSE218462_raw_counts_GRCh38.p13_NCBI.tsv", sep = '\t')
+```
+
+```python
+raw_df1
+```
+
+```python
+genes = raw_df1["GeneID"]
+samples = raw_df1.columns
+```
+
+```python
+samples
+```
+
+```python
+raw_df1_T = raw_df1.T
+raw_df1_T
+```
+
+```python
+raw_df1_T.columns = raw_df1_T.iloc[0]
+raw_df1_T = raw_df1_T[1:]
+```
+
+```python
+raw_df1_T
+```
+
+```python
+scaler = StandardScaler()
+scaled_data1 = scaler.fit_transform(raw_df1_T)
+```
+
+```python
+scaled_df1 = pd.DataFrame(scaled_data1)
+scaled_df1
+```
+
+```python
+scaled_df1.columns = raw_df1_T.columns
+scaled_df1.index = raw_df1_T.index
+```
+
+```python
+scaled_df1
+```
+
+**EDA using raw_df1_T**
+
+```python
+raw_df1_T
+```
+
+```python
+raw_df1_T.info()
+```
+
+```python
+print(raw_df1_T.duplicated().sum())
+print(raw_df1_T.isnull().sum())
+```
+
+**1-3: BE4**
+
+**4-6: ABE8**
+
+**7-9: Cas9**
+
+**10-12: Utelectro**
+
+**13-15: BE4**
+
+**16-18: ABE8**
+
+**19-21: Cas9**
+
+**22-24: Utelectro**

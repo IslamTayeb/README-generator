@@ -19,6 +19,7 @@ const generative_ai_1 = require("@google/generative-ai");
 const pdf_parse_1 = __importDefault(require("pdf-parse"));
 const promises_1 = __importDefault(require("fs/promises"));
 const path_1 = __importDefault(require("path"));
+const tokenizer_1 = require("@anthropic-ai/tokenizer");
 (0, dotenv_1.config)();
 const router = express_1.default.Router();
 // Initialize Gemini API
@@ -98,20 +99,6 @@ const extractPdfContent = (buffer) => __awaiter(void 0, void 0, void 0, function
         return '# Error in parsing PDF\n';
     }
 });
-const savePromptToFile = (prompt, identifier) => __awaiter(void 0, void 0, void 0, function* () {
-    try {
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const filename = `prompt-${identifier}-${timestamp}.txt`;
-        const promptsDir = path_1.default.join(process.cwd(), 'prompts');
-        // Create prompts directory if it doesn't exist
-        yield promises_1.default.mkdir(promptsDir, { recursive: true });
-        yield promises_1.default.writeFile(path_1.default.join(promptsDir, filename), prompt, 'utf-8');
-        console.log(`Prompt saved to ${filename}`);
-    }
-    catch (err) {
-        console.error('Failed to save prompt:', err);
-    }
-});
 // Function to determine if a file should be included
 const shouldIncludeFile = (filePath, size) => {
     const ignoredExtensions = [
@@ -135,25 +122,7 @@ const shouldIncludeFile = (filePath, size) => {
     }
     return true;
 };
-// Function to chunk content
-const chunkContent = (content, maxChunkSize = 15000) => {
-    const chunks = [];
-    let currentChunk = '';
-    const lines = content.split('\n');
-    for (const line of lines) {
-        if ((currentChunk + line).length > maxChunkSize) {
-            chunks.push(currentChunk);
-            currentChunk = line;
-        }
-        else {
-            currentChunk += (currentChunk ? '\n' : '') + line;
-        }
-    }
-    if (currentChunk) {
-        chunks.push(currentChunk);
-    }
-    return chunks;
-};
+// Route handler for /fetch-tree
 router.get('/fetch-tree', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     try {
@@ -184,17 +153,8 @@ router.get('/fetch-tree', (req, res) => __awaiter(void 0, void 0, void 0, functi
         })
             .map(file => file.path);
         console.log('Pre-selected files:', preSelectedFiles);
-        // Process files for tree view
-        const processedFiles = repoTree.map(item => ({
-            path: item.path,
-            mode: item.mode,
-            type: item.type,
-            sha: item.sha,
-            size: item.size,
-            url: item.url
-        }));
         res.json({
-            files: processedFiles,
+            files: repoTree,
             preSelectedFiles
         });
     }
@@ -203,6 +163,57 @@ router.get('/fetch-tree', (req, res) => __awaiter(void 0, void 0, void 0, functi
         res.status(500).json({ error: 'Failed to fetch repository tree' });
     }
 }));
+const savePromptToFile = (prompt) => __awaiter(void 0, void 0, void 0, function* () {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `prompt-${timestamp}.txt`;
+    const promptsDir = path_1.default.join(process.cwd(), 'prompts');
+    try {
+        // Create the prompts directory if it does not exist
+        yield promises_1.default.mkdir(promptsDir, { recursive: true });
+        yield promises_1.default.writeFile(path_1.default.join(promptsDir, filename), prompt, 'utf-8');
+        console.log(`Prompt saved to ${filename}`);
+    }
+    catch (err) {
+        console.error('Failed to save prompt:', err);
+    }
+});
+const retryGemini = (prompt_1, ...args_1) => __awaiter(void 0, [prompt_1, ...args_1], void 0, function* (prompt, retries = 5, interval = 30000) {
+    for (let attempt = 1; attempt <= retries; attempt++) {
+        try {
+            console.log(`Attempt ${attempt} to generate README...`);
+            const result = yield model.generateContent(prompt);
+            const readmeContent = yield result.response.text();
+            if (readmeContent) {
+                return readmeContent;
+            }
+        }
+        catch (error) {
+            console.error(`Attempt ${attempt} failed:`, error);
+        }
+        // Wait before retrying
+        if (attempt < retries) {
+            yield new Promise((resolve) => setTimeout(resolve, interval));
+        }
+    }
+    // Return null if all attempts fail
+    return null;
+});
+const createFullPrompt = (filesContent) => {
+    return `You are an AI assistant that creates detailed and technical README.md files for software projects.
+Here is the full codebase to analyze:
+
+${filesContent}
+
+Based on the code above, generate a comprehensive README.md that includes:
+1. Project Overview
+2. Main Features and Functionality
+3. Setup and Installation Instructions
+4. Usage Guide
+5. Dependencies
+6. How to Contribute
+
+Format the response in proper Markdown with clear sections, code blocks where appropriate, and detailed explanations.`;
+};
 // Endpoint to generate README from selected files
 router.post('/generate-readme', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
@@ -218,7 +229,6 @@ router.post('/generate-readme', (req, res) => __awaiter(void 0, void 0, void 0, 
             return;
         }
         const [owner, repo] = decodeURIComponent(repoUrl).replace('https://github.com/', '').split('/');
-        // Fetch content for selected files
         let filesContent = '';
         for (const filePath of selectedFiles) {
             try {
@@ -229,42 +239,41 @@ router.post('/generate-readme', (req, res) => __awaiter(void 0, void 0, void 0, 
                     if (filePath.endsWith('.ipynb')) {
                         content = convertIpynbToMarkdown(content);
                     }
-                    filesContent += `### File: ${filePath}\n${content}\n\n`;
+                    filesContent += `
+=== File: ${filePath} ===
+Type: ${fileNode.type}
+Size: ${fileNode.size} bytes
+SHA: ${fileNode.sha}
+
+${content}
+
+`;
                 }
             }
             catch (err) {
                 console.warn(`Failed to fetch content for file ${filePath}:`, err);
             }
         }
-        // Process content chunks
-        const chunks = chunkContent(filesContent);
-        let fullContext = '';
-        // Process each chunk and save intermediate prompts
-        for (let i = 0; i < chunks.length; i++) {
-            const chunk = chunks[i];
-            const analysisPrompt = `Analyze this portion of the codebase and extract key information about functionality, dependencies, and features:\n\n${chunk}`;
-            // Save analysis prompt
-            yield savePromptToFile(analysisPrompt, `chunk-${i}`);
-            const analysisResult = yield model.generateContent(analysisPrompt);
-            fullContext += (yield analysisResult.response.text()) + '\n\n';
+        // Create the full prompt
+        const fullPrompt = createFullPrompt(filesContent);
+        // Calculate token count and log it
+        const tokenEstimate = (0, tokenizer_1.countTokens)(fullPrompt);
+        console.log(`Token count: ${tokenEstimate}`);
+        // Save the prompt to a file
+        yield savePromptToFile(fullPrompt);
+        // Check token limit
+        if (tokenEstimate > 900000) {
+            res.status(413).json({
+                error: 'Token limit exceeded',
+                message: 'Please select fewer files. The current selection exceeds the 500,000 token limit.',
+                tokenCount: tokenEstimate
+            });
+            return;
         }
-        const result = yield model.generateContent(`You are an AI assistant that creates detailed and technical README.md files for software projects.
-Based on this analysis of the project:
-
-${fullContext}
-
-Generate a comprehensive README.md that includes:
-1. Project Overview
-2. Main Features and Functionality
-3. Setup and Installation Instructions
-4. Usage Guide
-5. Dependencies
-6. How to Contribute
-
-Format the response in proper Markdown with clear sections, code blocks where appropriate, and detailed explanations.`);
-        const readmeContent = yield result.response.text();
+        // Attempt to generate README up to 5 times if it fails
+        const readmeContent = yield retryGemini(fullPrompt);
         if (!readmeContent) {
-            res.status(500).json({ error: 'Failed to generate README content.' });
+            res.status(500).json({ error: 'Failed to generate README content after multiple attempts.' });
             return;
         }
         res.json({ readme: readmeContent });

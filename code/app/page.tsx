@@ -28,6 +28,7 @@ export default function Dashboard() {
   const [repoUrl, setRepoUrl] = React.useState("");
   const [isEditorMode, setIsEditorMode] = React.useState(false);
   const [repositories, setRepositories] = React.useState<Project[]>([]);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
 
   // GitHub Authentication Handler
   const handleGithubAuth = () => {
@@ -89,6 +90,7 @@ export default function Dashboard() {
   const handleNavigateToEditor = (repoUrl: string) => {
     setRepoUrl(repoUrl);
     setIsEditorMode(true);
+    setIsSidebarCollapsed(true);
   };
 
   // JSX where you render the repositories (update to match):
@@ -103,14 +105,15 @@ export default function Dashboard() {
   ));
 
   return (
-    <SidebarProvider defaultCollapsed={isEditorMode}>
-      <div className="flex w-full bg-background text-foreground">
+    <div className="flex w-full bg-background text-foreground">
+      <SidebarProvider>
         <AppSidebar
           isAuthenticated={isAuthenticated}
           projects={repositories.length ? repositories : []}
           onNewProject={navigateToLandingPage}
           onAuthenticate={handleGithubAuth}
           onNavigateToEditor={handleNavigateToEditor}
+          collapsed={isSidebarCollapsed}
         />
 
         <main className="flex flex-1 flex-col">
@@ -227,7 +230,7 @@ export default function Dashboard() {
             )}
           </AnimatePresence>
         </main>
-      </div>
-    </SidebarProvider>
+      </SidebarProvider>
+    </div>
   );
 }

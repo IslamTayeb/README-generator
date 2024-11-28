@@ -25,6 +25,7 @@ interface FileTreeProps {
   onNext: (selectedFiles: string[], selectedDirectories: string[]) => void;
   preCheckedFiles?: string[];
   onClose: () => void;
+  autoCollapse?: boolean;
 }
 
 interface TreeNode {
@@ -41,6 +42,7 @@ export function FileTree({
   onNext,
   preCheckedFiles = [],
   onClose,
+  autoCollapse = false,  // default to false
 }: FileTreeProps) {
   // Initialize selected files with pre-checked files
   const [selectedFiles, setSelectedFiles] = React.useState<Set<string>>(() => {
@@ -48,22 +50,26 @@ export function FileTree({
     return new Set(preCheckedFiles);
   });
 
-  // Initialize expanded folders to include parents of pre-selected files
-  const [expandedFolders, setExpandedFolders] = React.useState<Set<string>>(
-    () => {
+  // Initialize expanded folders
+  const [expandedFolders, setExpandedFolders] = React.useState<Set<string>>(() => {
+    if (autoCollapse) {
+      // Start with all folders collapsed
+      return new Set<string>();
+    } else if (preCheckedFiles.length > 0) {
+      // Expand parent folders of pre-selected files if they exist
       const expanded = new Set<string>();
       preCheckedFiles.forEach((filePath) => {
         const parts = filePath.split("/");
-        let currentPath = "";
+        let currentPath = '';
         for (let i = 0; i < parts.length - 1; i++) {
-          currentPath += (currentPath ? "/" : "") + parts[i];
+          currentPath += (currentPath ? '/' : '') + parts[i];
           expanded.add(currentPath);
         }
       });
-      console.log("Initialized expanded folders:", expanded);
       return expanded;
     }
-  );
+    return new Set<string>();
+  });
 
   // Effect to handle preCheckedFiles updates
   React.useEffect(() => {
@@ -267,13 +273,13 @@ export function FileTree({
           exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.3 }}
         >
-          <ScrollArea className="w-full" orientation="horizontal">
+          <ScrollArea className="w-full">
             <div
               className={cn(
                 "flex items-center gap-2 py-1 px-2 rounded-sm group hover:bg-secondary/40 min-w-max",
                 nodeState === "indeterminate" && "bg-secondary/20"
               )}
-              style={{ paddingLeft: `${level * 20}px` }}
+              // style={{ paddingLeft: `${level * 20}px` }}
             >
               <div className="relative flex items-center justify-center">
                 <Checkbox
@@ -306,12 +312,12 @@ export function FileTree({
                   >
                     <ChevronRight className="h-4 w-4 shrink-0" />
                   </motion.div>
-                  <Folder className="h-4 w-4 shrink-0" />
+                  <Folder className="h-4 w-4 shrink-0 text-accent-foreground" />
                   <span className="truncate">{name}</span>
                 </button>
               ) : (
                 <div className="flex items-center gap-2 flex-1 text-sm">
-                  <File className="h-4 w-4 shrink-0" />
+                  {/* <File className="h-4 w-4 shrink-0" /> */}
                   <span className="truncate">{name}</span>
                 </div>
               )}
