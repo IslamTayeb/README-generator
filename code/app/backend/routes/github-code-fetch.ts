@@ -1,7 +1,10 @@
-import express, { Request, Response, NextFunction } from 'express';
+import express, { Request, Response } from 'express';
 import axios from 'axios';
 import { config } from 'dotenv';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import pdf from 'pdf-parse';
+import fs from 'fs/promises';
+import path from 'path';
 
 config();
 
@@ -13,9 +16,11 @@ const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 interface FileNode {
   path: string;
+  mode: string;
   type: string;
   sha: string;
   size: number;
+  url: string;
 }
 
 interface SelectedFile {
@@ -32,7 +37,6 @@ const fetchRepoTree = async (owner: string, repo: string, accessToken: string): 
       Authorization: `Bearer ${accessToken}`,
     },
   });
-  console.log(response.data.tree);
   return response.data.tree;
 };
 
@@ -45,25 +49,32 @@ const fetchFileContent = async (owner: string, repo: string, fileSha: string, ac
       Authorization: `Bearer ${accessToken}`,
       Accept: 'application/vnd.github.v3.raw',
     },
+    responseType: 'arraybuffer', // Important for handling PDFs
   });
-  console.log(`Content fetched for SHA ${fileSha}:`, response.data.length, 'characters');
-  return response.data;
+
+  // Check if response is PDF
+  const isPdf = response.headers['content-type']?.includes('application/pdf');
+  if (isPdf) {
+    return extractPdfContent(response.data);
+  }
+
+  // Handle non-PDF content
+  return typeof response.data === 'string'
+    ? response.data
+    : Buffer.from(response.data).toString('utf-8');
 };
 
 // Function to convert Jupyter Notebook (.ipynb) files to markdown
 const convertIpynbToMarkdown = (content: string | object): string => {
   try {
     let notebook;
-
-    // Handle content as an object or string
     if (typeof content === 'string') {
       notebook = JSON.parse(content);
     } else {
-      notebook = content; // Assuming it's already parsed
+      notebook = content;
     }
 
     let markdown = '# Jupyter Notebook Conversion\n';
-
     if (notebook.cells) {
       for (const cell of notebook.cells) {
         if (cell.cell_type === 'markdown') {
@@ -75,7 +86,6 @@ const convertIpynbToMarkdown = (content: string | object): string => {
     } else {
       markdown += 'Notebook format not recognized.\n';
     }
-
     return markdown;
   } catch (err) {
     console.error('Failed to convert .ipynb file:', err);
@@ -83,16 +93,44 @@ const convertIpynbToMarkdown = (content: string | object): string => {
   }
 };
 
+const extractPdfContent = async (buffer: Buffer): Promise<string> => {
+  try {
+    const data = await pdf(buffer);
+    return data.text;
+  } catch (err) {
+    console.error('Failed to parse PDF:', err);
+    return '# Error in parsing PDF\n';
+  }
+};
+
+const savePromptToFile = async (prompt: string, identifier: string) => {
+  try {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const filename = `prompt-${identifier}-${timestamp}.txt`;
+    const promptsDir = path.join(process.cwd(), 'prompts');
+
+    // Create prompts directory if it doesn't exist
+    await fs.mkdir(promptsDir, { recursive: true });
+
+    await fs.writeFile(
+      path.join(promptsDir, filename),
+      prompt,
+      'utf-8'
+    );
+    console.log(`Prompt saved to ${filename}`);
+  } catch (err) {
+    console.error('Failed to save prompt:', err);
+  }
+};
+
 // Function to determine if a file should be included
 const shouldIncludeFile = (filePath: string, size: number): boolean => {
   const ignoredExtensions = [
-    '.pdf', '.csv', '.json', '.tsv', '.xls', '.xlsx',
-    '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp',
-    '.mp4', '.avi', '.mkv', '.mov', '.webm', '.wmv',
-    '.mp3', '.wav', '.flac',
-    '.log', '.DS_Store',
+    '.csv', '.json', '.tsv', '.xls', '.xlsx', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.mp4', '.avi', '.mkv', '.mov', '.webm', '.wmv', '.mp3', '.wav', '.flac', '.log', '.DS_Store', '.zip', '.gz', '.tar', '.7z'
   ];
-  const ignoredDirectories = ['node_modules/', 'dist/'];
+  const ignoredDirectories = [
+    'node_modules/', 'dist/', 'venv/', 'env/', '.git/', '.vscode/', '.gitignore', '.env', '.gitattributes', '.python-version', '.venv', 'yarn.lock', 'package-lock.json'
+  ];
   const maxFileSize = 10000000;
 
   if (ignoredExtensions.some(ext => filePath.endsWith(ext))) {
@@ -110,15 +148,10 @@ const shouldIncludeFile = (filePath: string, size: number): boolean => {
     return false;
   }
 
-  if (filePath.includes('data') || filePath.includes('dataset')) {
-    console.log(`File excluded based on data/dataset naming: ${filePath}`);
-    return false;
-  }
-
   return true;
 };
 
-// Optimized function to chunk content if it's too large
+// Function to chunk content
 const chunkContent = (content: string, maxChunkSize: number = 15000): string[] => {
   const chunks: string[] = [];
   let currentChunk = '';
@@ -137,16 +170,12 @@ const chunkContent = (content: string, maxChunkSize: number = 15000): string[] =
     chunks.push(currentChunk);
   }
 
-  console.log(`Content chunked into ${chunks.length} parts.`);
   return chunks;
 };
 
-// Combined route to fetch code from repository and generate README
-router.post('/fetch-and-generate-readme', async (req: Request, res: Response): Promise<void> => {
+router.get('/fetch-tree', async (req: Request, res: Response) => {
   try {
-    console.log('Request received for /fetch-and-generate-readme with repoUrl:', req.body.repoUrl);
-
-    let repoUrl = req.body.repoUrl as string;
+    let repoUrl = req.query.repoUrl as string;
     if (!repoUrl) {
       res.status(400).json({ error: 'Missing repository URL' });
       return;
@@ -167,53 +196,96 @@ router.post('/fetch-and-generate-readme', async (req: Request, res: Response): P
       return;
     }
 
-    // Step 1: Fetch repository tree
+    // Fetch repository tree
     const repoTree = await fetchRepoTree(owner, repo, accessToken);
-    console.log('Fetched repository tree:', repoTree.length, 'nodes found.');
 
-    // Step 2: Filter eligible files based on criteria
-    const eligibleFiles = repoTree.filter((node: FileNode) =>
-      node.type === 'blob' && shouldIncludeFile(node.path, node.size)
-    );
+    // Get pre-selected files
+    const preSelectedFiles = repoTree
+      .filter((node: FileNode) => {
+        const shouldInclude = shouldIncludeFile(node.path, node.size);
+        console.log(`File ${node.path}: should include = ${shouldInclude}`);
+        return node.type === "blob" && shouldInclude;
+      })
+      .map(file => file.path);
 
-    console.log('Filtered eligible files:', eligibleFiles.length, 'files selected.');
+    console.log('Pre-selected files:', preSelectedFiles);
 
-    // Step 3: Fetch content for selected files
+    // Process files for tree view
+    const processedFiles = repoTree.map(item => ({
+      path: item.path,
+      mode: item.mode,
+      type: item.type,
+      sha: item.sha,
+      size: item.size,
+      url: item.url
+    }));
+
+    res.json({
+      files: processedFiles,
+      preSelectedFiles
+    });
+
+  } catch (error) {
+    console.error('Error fetching repository tree:', error);
+    res.status(500).json({ error: 'Failed to fetch repository tree' });
+  }
+});
+
+// Endpoint to generate README from selected files
+router.post('/generate-readme', async (req: Request, res: Response) => {
+  try {
+    const { repoUrl, selectedFiles } = req.body;
+    if (!repoUrl || !selectedFiles) {
+      res.status(400).json({ error: 'Missing required parameters' });
+      return;
+    }
+
+    const accessToken = req.session?.accessToken;
+    if (!accessToken) {
+      res.status(401).json({ error: 'User not authenticated' });
+      return;
+    }
+
+    const [owner, repo] = decodeURIComponent(repoUrl).replace('https://github.com/', '').split('/');
+
+    // Fetch content for selected files
     let filesContent = '';
-    for (const fileNode of eligibleFiles) {
+    for (const filePath of selectedFiles) {
       try {
-        console.log(`Fetching content for file: ${fileNode.path}`);
-        let content = await fetchFileContent(owner, repo, fileNode.sha, accessToken);
+        const fileNode = (await fetchRepoTree(owner, repo, accessToken))
+          .find(node => node.path === filePath);
 
-        if (fileNode.path.endsWith('.ipynb')) {
-          content = convertIpynbToMarkdown(content);
+        if (fileNode) {
+          let content = await fetchFileContent(owner, repo, fileNode.sha, accessToken);
+
+          if (filePath.endsWith('.ipynb')) {
+            content = convertIpynbToMarkdown(content);
+          }
+
+          filesContent += `### File: ${filePath}\n${content}\n\n`;
         }
-
-        filesContent += `### File: ${fileNode.path}\n${content}\n\n`;
       } catch (err) {
-        console.warn(`Failed to fetch content for file ${fileNode.path}:`, err);
+        console.warn(`Failed to fetch content for file ${filePath}:`, err);
       }
     }
 
-    console.log('All selected files fetched successfully.');
-
-    // Step 4: Split content into chunks if necessary
+    // Process content chunks
     const chunks = chunkContent(filesContent);
     let fullContext = '';
 
-    // Step 5: Process each chunk with Gemini to build context
-    for (const chunk of chunks) {
-      console.log('Processing chunk with Gemini.');
+    // Process each chunk and save intermediate prompts
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
       const analysisPrompt = `Analyze this portion of the codebase and extract key information about functionality, dependencies, and features:\n\n${chunk}`;
+
+      // Save analysis prompt
+      await savePromptToFile(analysisPrompt, `chunk-${i}`);
+
       const analysisResult = await model.generateContent(analysisPrompt);
-      const analysisText = await analysisResult.response.text();
-      console.log('Chunk processed successfully.');
-      fullContext += analysisText + '\n\n';
+      fullContext += await analysisResult.response.text() + '\n\n';
     }
 
-    // Step 6: Generate final README with accumulated context
-    console.log('Generating final README.md using Gemini.');
-    const readmePrompt = `You are an AI assistant that creates detailed and technical README.md files for software projects.
+    const result = await model.generateContent(`You are an AI assistant that creates detailed and technical README.md files for software projects.
 Based on this analysis of the project:
 
 ${fullContext}
@@ -226,12 +298,9 @@ Generate a comprehensive README.md that includes:
 5. Dependencies
 6. How to Contribute
 
-Format the response in proper Markdown with clear sections, code blocks where appropriate, and detailed explanations.`;
+Format the response in proper Markdown with clear sections, code blocks where appropriate, and detailed explanations.`);
 
-    const result = await model.generateContent(readmePrompt);
     const readmeContent = await result.response.text();
-    console.log('README generated successfully.');
-
     if (!readmeContent) {
       res.status(500).json({ error: 'Failed to generate README content.' });
       return;
@@ -240,11 +309,8 @@ Format the response in proper Markdown with clear sections, code blocks where ap
     res.json({ readme: readmeContent });
 
   } catch (error) {
-    console.error('Error fetching repository content or generating README:', error);
-    res.status(500).json({
-      error: 'Failed to generate README.',
-      details: error instanceof Error ? error.message : 'Unknown error'
-    });
+    console.error('Error generating README:', error);
+    res.status(500).json({ error: 'Failed to generate README' });
   }
 });
 
