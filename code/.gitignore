@@ -8,6 +8,9 @@
 
 # testing
 /coverage
+/app/backend/prompts
+/app/backend/dist/
+/app/backend/.env
 
 # next.js
 /.next/
@@ -27,6 +30,7 @@ yarn-error.log*
 
 # local env files
 .env*.local
+
 
 # vercel
 .vercel

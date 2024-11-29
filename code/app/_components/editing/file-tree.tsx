@@ -42,7 +42,6 @@ export function FileTree({
   onNext,
   preCheckedFiles = [],
   onClose,
-  autoCollapse = false,  // default to false
 }: FileTreeProps) {
   // Initialize selected files with pre-checked files
   const [selectedFiles, setSelectedFiles] = React.useState<Set<string>>(() => {
@@ -50,26 +49,26 @@ export function FileTree({
     return new Set(preCheckedFiles);
   });
 
-  // Initialize expanded folders
-  const [expandedFolders, setExpandedFolders] = React.useState<Set<string>>(() => {
-    if (autoCollapse) {
+  // Initialize expanded folders to include parents of pre-selected files
+  const [expandedFolders, setExpandedFolders] = React.useState<Set<string>>(
+    () => {
+      // Only expand parent folders of pre-selected files if they exist
+      if (preCheckedFiles.length > 0) {
+        const expanded = new Set<string>();
+        preCheckedFiles.forEach((filePath) => {
+          const parts = filePath.split("/");
+          let currentPath = "";
+          for (let i = 0; i < parts.length - 1; i++) {
+            currentPath += (currentPath ? "/" : "") + parts[i];
+            expanded.add(currentPath);
+          }
+        });
+        return expanded;
+      }
       // Start with all folders collapsed
       return new Set<string>();
-    } else if (preCheckedFiles.length > 0) {
-      // Expand parent folders of pre-selected files if they exist
-      const expanded = new Set<string>();
-      preCheckedFiles.forEach((filePath) => {
-        const parts = filePath.split("/");
-        let currentPath = '';
-        for (let i = 0; i < parts.length - 1; i++) {
-          currentPath += (currentPath ? '/' : '') + parts[i];
-          expanded.add(currentPath);
-        }
-      });
-      return expanded;
     }
-    return new Set<string>();
-  });
+  );
 
   // Effect to handle preCheckedFiles updates
   React.useEffect(() => {
@@ -279,7 +278,7 @@ export function FileTree({
                 "flex items-center gap-2 py-1 px-2 rounded-sm group hover:bg-secondary/40 min-w-max",
                 nodeState === "indeterminate" && "bg-secondary/20"
               )}
-              // style={{ paddingLeft: `${level * 20}px` }}
+            // style={{ paddingLeft: `${level * 20}px` }}
             >
               <div className="relative flex items-center justify-center">
                 <Checkbox
@@ -290,7 +289,7 @@ export function FileTree({
                   className={cn(
                     "rounded-sm border border-primary",
                     nodeState === "checked" &&
-                      "bg-primary text-primary-foreground",
+                    "bg-primary text-primary-foreground",
                     nodeState === "indeterminate" && "bg-transparent"
                   )}
                 />
@@ -388,20 +387,24 @@ export function FileTree({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
           transition={{ duration: 0.3 }}
+          className="w-full h-full flex items-center justify-center p-4"
         >
-          <Card className="w-full max-w-md border bg-card">
-            <div className="p-4 border-b flex justify-between items-center">
-              <div>
-                <h2 className="font-semibold">Select Files for README</h2>
-                <p className="text-sm text-muted-foreground">
-                  Choose which files to include in the documentation
-                </p>
+          <Card className="w-full max-w-3xl h-[90vh] flex flex-col border bg-card">
+            <div className="flex-none p-4 border-b">
+              <div className="flex justify-between items-center">
+                <div>
+                  <h2 className="font-semibold">Select Files for README</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Choose which files to include in the documentation
+                  </p>
+                </div>
+                <Button variant="ghost" size="icon" onClick={handleBack}>
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
-              <Button variant="ghost" size="icon" onClick={handleBack}>
-                <X className="h-4 w-4" />
-              </Button>
             </div>
-            <div className="p-4 border-b">
+
+            <div className="flex-none p-4 border-b">
               <div className="relative">
                 <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -413,36 +416,37 @@ export function FileTree({
                 />
               </div>
             </div>
-            <div className="relative">
-              <ScrollArea className="h-[400px] w-full">
-                <motion.div
-                  className="p-2"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ duration: 0.3 }}
-                >
+
+            <div className="flex-1 min-h-0">
+              <ScrollArea className="h-full">
+                <div className="p-4">
                   {Object.entries(fileTree).map(([name, node]) =>
                     renderTreeNode(node, name)
                   )}
-                </motion.div>
+                </div>
               </ScrollArea>
-              <div className="absolute bottom-2 right-4 text-sm text-muted-foreground">
-                {selectedCount} file{selectedCount !== 1 ? "s" : ""} selected
-              </div>
             </div>
-            <div className="p-4 border-t flex justify-between items-center">
-              <p className="text-sm text-muted-foreground">
-                {selectedCount > MAX_FILES ? (
-                  <span className="text-destructive">
-                    Warning: {selectedCount - MAX_FILES} files over limit
+
+            <div className="flex-none p-4 border-t">
+              <div className="flex justify-between items-center">
+                <p className="text-sm text-muted-foreground">
+                  {selectedCount > MAX_FILES ? (
+                    <span className="text-destructive">
+                      Warning: {selectedCount - MAX_FILES} files over limit
+                    </span>
+                  ) : (
+                    <span>{MAX_FILES - selectedCount} files remaining</span>
+                  )}
+                </p>
+                <div className="flex items-center gap-4">
+                  <span className="text-sm text-muted-foreground">
+                    {selectedCount} file{selectedCount !== 1 ? "s" : ""} selected
                   </span>
-                ) : (
-                  <span>{MAX_FILES - selectedCount} files remaining</span>
-                )}
-              </p>
-              <Button onClick={handleNext} disabled={selectedCount > MAX_FILES}>
-                Next
-              </Button>
+                  <Button onClick={handleNext} disabled={selectedCount > MAX_FILES}>
+                    Next
+                  </Button>
+                </div>
+              </div>
             </div>
           </Card>
         </motion.div>

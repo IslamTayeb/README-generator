@@ -10,11 +10,11 @@ interface MarkdownEditorProps {
 
 export function MarkdownEditor({ value, onChange }: MarkdownEditorProps) {
   return (
-    <div className="flex flex-col h-full">
+    <div className="h-full flex flex-col">
       <h2 className="text-xl font-bold p-4 text-foreground border-b bg-card">
         Markdown IDE Editor
       </h2>
-      <div className="flex-grow">
+      <div className="flex-1 overflow-hidden">
         <MonacoEditor
           height="100%"
           defaultLanguage="markdown"
@@ -31,8 +31,18 @@ export function MarkdownEditor({ value, onChange }: MarkdownEditorProps) {
             renderLineHighlight: 'all',
             scrollBeyondLastLine: false,
             wordWrap: 'on',
+            wrappingStrategy: 'advanced',
             padding: { top: 10, bottom: 10 },
             fontSize: 14,
+            automaticLayout: true,
+            fixedOverflowWidgets: true,
+            scrollbar: {
+              vertical: 'visible',
+              horizontal: 'auto',
+              useShadows: false,
+              verticalScrollbarSize: 12,
+              arrowSize: 11
+            }
           }}
         />
       </div>

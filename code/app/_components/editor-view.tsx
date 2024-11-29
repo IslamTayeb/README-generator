@@ -1,16 +1,11 @@
-"use client";
+"use client"
 
-import React, { useState, useEffect } from "react";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
-import { MarkdownEditor } from "@/app/_components/markdown-editor";
-import { MarkdownViewer } from "@/app/_components/markdown-viewer";
-import { ChatWithGemini } from "@/app/_components/chat-with-gemini";
-import { FileTree } from "@/app/_components/file-tree";
-import axios from "axios";
+import React, { useState, useEffect } from "react"
+import { MarkdownEditor } from "@/app/_components/editing/markdown-editor"
+import { MarkdownViewer } from "@/app/_components/editing/markdown-viewer"
+import { ChatWithGemini } from "@/app/_components/editing/chat-with-gemini"
+import { FileTree } from "@/app/_components/editing/file-tree"
+import axios from "axios"
 
 interface FileTreeItem {
   path: string;
@@ -21,8 +16,16 @@ interface FileTreeItem {
   url: string;
 }
 
-export function EditorView({ repoUrl }: { repoUrl: string }) {
-  const [markdown, setMarkdown] = useState("");
+interface EditorViewProps {
+  repoUrl: string;
+  markdown: string;
+  setMarkdown: (markdown: string) => void;
+}
+
+export function EditorView({ repoUrl, markdown, setMarkdown }: EditorViewProps) {
+  // Add this at the top of the component to debug props
+  console.log("EditorView props:", { repoUrl, markdown, setMarkdown: !!setMarkdown });
+
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [showFileTree, setShowFileTree] = useState(true);
@@ -31,8 +34,8 @@ export function EditorView({ repoUrl }: { repoUrl: string }) {
 
   const fetchRepositoryTree = async () => {
     try {
-      setLoading(true);
-      const encodedRepoUrl = encodeURIComponent(repoUrl);
+      setLoading(true)
+      const encodedRepoUrl = encodeURIComponent(repoUrl)
       const response = await axios.get(
         `http://localhost:3001/api/github/fetch-tree?repoUrl=${encodedRepoUrl}`,
         {
@@ -41,26 +44,26 @@ export function EditorView({ repoUrl }: { repoUrl: string }) {
             Accept: "application/json",
           },
         }
-      );
+      )
 
-      console.log("Received repository tree response:", response.data);
+      console.log("Received repository tree response:", response.data)
 
       if (response.data.files && response.data.preSelectedFiles) {
-        setFiles(response.data.files);
-        setPreSelectedFiles(response.data.preSelectedFiles);
+        setFiles(response.data.files)
+        setPreSelectedFiles(response.data.preSelectedFiles)
       }
     } catch (error) {
-      console.error("Failed to fetch repository tree:", error);
+      console.error("Failed to fetch repository tree:", error)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   useEffect(() => {
     if (repoUrl) {
-      fetchRepositoryTree();
+      fetchRepositoryTree()
     }
-  }, [repoUrl]);
+  }, [repoUrl])
 
   const handleFileSelection = async (
     selectedFiles: string[],
@@ -69,6 +72,13 @@ export function EditorView({ repoUrl }: { repoUrl: string }) {
     try {
       setLoading(true);
       const encodedRepoUrl = encodeURIComponent(repoUrl);
+      console.log("Generating README for files:", selectedFiles);
+
+      // Verify setMarkdown is a function before the axios call
+      if (typeof setMarkdown !== 'function') {
+        throw new Error('setMarkdown is not a function');
+      }
+
       const response = await axios.post(
         "http://localhost:3001/api/github/generate-readme",
         {
@@ -88,26 +98,29 @@ export function EditorView({ repoUrl }: { repoUrl: string }) {
         }
       );
 
+      console.log("Generated README response:", response.data);
+
       if (response.data.readme) {
+        console.log("Setting markdown content:", response.data.readme);
         setMarkdown(response.data.readme);
         setShowFileTree(false);
+      } else {
+        console.error("No README content in response");
       }
     } catch (error) {
       console.error("Failed to generate README:", error);
+      // Add more detailed error logging
+      if (error instanceof Error) {
+        console.error("Error details:", error.message);
+      }
     } finally {
       setLoading(false);
       setProgress(100);
     }
   };
 
-  useEffect(() => {
-    if (repoUrl) {
-      fetchRepositoryTree();
-    }
-  }, [repoUrl]);
-
   return (
-    <>
+    <div className="h-full flex flex-col">
       {loading && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75">
           <div className="flex flex-col items-center space-y-4">
@@ -125,7 +138,7 @@ export function EditorView({ repoUrl }: { repoUrl: string }) {
       )}
 
       {showFileTree ? (
-        <div className="flex justify-center items-center min-h-screen p-4">
+        <div className="flex-1 flex justify-center items-center p-4 overflow-auto">
           <FileTree
             files={files}
             preCheckedFiles={preSelectedFiles}
@@ -134,27 +147,23 @@ export function EditorView({ repoUrl }: { repoUrl: string }) {
           />
         </div>
       ) : (
-        <ResizablePanelGroup
-          direction="horizontal"
-          className="h-[calc(100vh-4rem)]"
-        >
-          <ResizablePanel defaultSize={50} minSize={30}>
+        <div className="flex-1 grid grid-cols-2 overflow-hidden">
+          {/* Left side - Editor */}
+          <div className="h-full overflow-hidden border-r border-border">
             <MarkdownEditor value={markdown} onChange={setMarkdown} />
-          </ResizablePanel>
-          <ResizableHandle />
-          <ResizablePanel defaultSize={50} minSize={30}>
-            <ResizablePanelGroup direction="vertical">
-              <ResizablePanel defaultSize={60} minSize={30}>
-                <MarkdownViewer markdown={markdown} />
-              </ResizablePanel>
-              <ResizableHandle />
-              <ResizablePanel defaultSize={40} minSize={20}>
-                <ChatWithGemini />
-              </ResizablePanel>
-            </ResizablePanelGroup>
-          </ResizablePanel>
-        </ResizablePanelGroup>
+          </div>
+
+          {/* Right side - Preview and Chat */}
+          <div className="h-full flex flex-col overflow-hidden">
+            <div className="h-[60%] min-h-0 border-b border-border overflow-hidden">
+              <MarkdownViewer markdown={markdown} />
+            </div>
+            <div className="h-[40%] min-h-0 overflow-hidden">
+               <ChatWithGemini />
+            </div>
+          </div>
+        </div>
       )}
-    </>
+    </div>
   );
 }

@@ -27,7 +27,7 @@ export function ChatWithGemini() {
       // Simulate Gemini's response
       setTimeout(() => {
         const geminiResponse: Message = {
-id: messages.length + 2,
+          id: messages.length + 2,
           text: "I've received your message. How else can I help with your README?",
           sender: 'gemini'
         }
