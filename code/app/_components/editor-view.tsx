@@ -250,7 +250,7 @@ export function EditorView({ repoUrl, markdown, setMarkdown }: EditorViewProps) 
         </div>
       ) : (
         <div className="flex flex-1 overflow-hidden">
-          <div className="w-[15%] overflow-auto">
+          <div className="w-[20%] overflow-auto !block">
             <SectionsColumn
               sections={sections}
               onSectionsChange={handleSectionsChange}
@@ -258,13 +258,13 @@ export function EditorView({ repoUrl, markdown, setMarkdown }: EditorViewProps) 
               currentMarkdown={markdown}
             />
           </div>
-          <div className="w-[42.5%] h-full overflow-hidden border-r border-border">
+          <div className="w-[40%] h-full overflow-hidden border-r border-border">
             <MarkdownEditor
               value={markdown}
               onChange={handleMarkdownChange}
             />
           </div>
-          <div className="w-[42.5%] h-full flex flex-col overflow-hidden">
+          <div className="w-[40%] h-full flex flex-col overflow-hidden">
             <div className="h-[60%] min-h-0 border-b border-border overflow-hidden">
               <MarkdownViewer markdown={previewMarkdown} />
             </div>

@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import axios from "axios"
+import { cn } from "@/lib/utils"
 
 interface Section {
   slug: string
@@ -191,139 +192,139 @@ export function SectionsColumn({ sections, onSectionsChange, repoUrl, currentMar
   )
 
   return (
-    <div className="flex flex-col h-full border-r border-border bg-card">
-      <div className="p-4 border-b">
+    <div className="flex flex-col h-full border-r border-border bg-card w-full">
+      <div className="flex-none p-3 border-b">
         <h3 className="text-sm font-medium">Sections</h3>
       </div>
 
-      <div className="">
-        <ScrollArea className="">
-          <div className="p-4 space-y-4 contents">
-            <div>
-              <h4 className="text-xs font-medium text-muted-foreground mb-3">
-                Document Sections
-              </h4>
-              <SectionFilter
-                searchFilter={searchFilter}
-                setSearchFilter={setSearchFilter}
-              />
-              <ul className="space-y-2 relative">
-                {dropIndicatorIndex === 0 && (
-                  <div className="absolute top-0 left-0 right-0 h-0.5 bg-primary -translate-y-1/2" />
-                )}
-                {filteredSections.map((section, index) => (
-                  <React.Fragment key={section.slug}>
-                    <li
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, section)}
-                      onDragOver={(e) => handleDragOver(e, section.slug, index)}
-                      onDragEnd={handleDragEnd}
-                      className={`relative flex items-center bg-secondary rounded-md ${focusedSectionSlug === section.slug ? 'ring-2 ring-primary' : ''
-                        }`}
-                    >
-                      <button
-                        className="flex-grow px-4 py-1.5 text-left focus:outline-none text-sm"
-                        onClick={() => setFocusedSectionSlug(section.slug)}
-                      >
-                        {section.name}
-                      </button>
-                      <div className="flex items-center pr-2 space-x-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={() => onDeleteSection(section.slug)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                            >
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem>Edit</DropdownMenuItem>
-                            <DropdownMenuItem>Duplicate</DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={() => onDeleteSection(section.slug)}
-                            >
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                        <div className="cursor-move p-2">
-                          <GripVertical className="h-4 w-4" />
-                        </div>
-                      </div>
-                    </li>
-                    {dropIndicatorIndex === index + 1 && (
-                      <div className="h-0.5 bg-primary w-full" />
-                    )}
-                  </React.Fragment>
-                ))}
-              </ul>
-            </div>
-            <Separator />
-            <div>
-              <h4 className="text-xs font-medium text-muted-foreground mb-3">
-                Create Custom Section
-              </h4>
-              <div className="space-y-2">
-                <Input
-                  placeholder="Section title"
-                  value={newSectionTitle}
-                  onChange={(e) => setNewSectionTitle(e.target.value)}
-                />
-                <Textarea
-                  placeholder="Description (optional)"
-                  value={newSectionDescription}
-                  onChange={(e) => setNewSectionDescription(e.target.value)}
-                  rows={3}
-                />
-                <Button
-                  className="w-full"
-                  onClick={handleGenerateNewSection}
-                  disabled={isGenerating || !newSectionTitle.trim()}
+      {/* <ScrollArea > */}
+        <div className="p-3 space-y-4">
+          <h4 className="text-xs font-medium text-muted-foreground mb-2">
+            Document Sections
+          </h4>
+          <SectionFilter
+            searchFilter={searchFilter}
+            setSearchFilter={setSearchFilter}
+          />
+          <ul className="space-y-1.5 relative">
+            {dropIndicatorIndex === 0 && (
+              <div className="absolute top-0 left-0 right-0 h-0.5 bg-primary -translate-y-1/2" />
+            )}
+            {filteredSections.map((section, index) => (
+              <React.Fragment key={section.slug}>
+                <li
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, section)}
+                  onDragOver={(e) => handleDragOver(e, section.slug, index)}
+                  onDragEnd={handleDragEnd}
+                  className={cn(
+                    "group relative flex items-center bg-secondary rounded-md hover:bg-secondary/80",
+                    focusedSectionSlug === section.slug && "ring-2 ring-primary"
+                  )}
                 >
-                  <PlusCircle className="w-4 h-4 mr-2" />
-                  {isGenerating ? 'Generating...' : 'Generate Section'}
-                </Button>
-              </div>
+                  <div className="flex items-center min-w-0 flex-1">
+                    <button
+                      className="flex-1 px-4 py-2 text-left focus:outline-none min-w-0"
+                      onClick={() => setFocusedSectionSlug(section.slug)}
+                    >
+                      <span className="block truncate text-sm">{section.name}</span>
+                    </button>
+                    <div className="flex-none flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7"
+                          >
+                            <MoreVertical className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-32">
+                          <DropdownMenuItem
+                            className="text-destructive"
+                            onClick={() => onDeleteSection(section.slug)}
+                          >
+                            Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                      <div className="cursor-move p-1.5">
+                        <GripVertical className="h-4 w-4" />
+                      </div>
+                    </div>
+                  </div>
+                </li>
+                {dropIndicatorIndex === index + 1 && (
+                  <div className="h-0.5 bg-primary w-full" />
+                )}
+              </React.Fragment>
+            ))}
+          </ul>
+
+
+          <Separator />
+
+          <div>
+            <h4 className="text-xs font-medium text-muted-foreground mb-2">
+              Create Custom Section
+            </h4>
+            <div className="space-y-2">
+              <Input
+                placeholder="Section title"
+                value={newSectionTitle}
+                onChange={(e) => setNewSectionTitle(e.target.value)}
+              />
+              <Textarea
+                placeholder="Description (optional)"
+                value={newSectionDescription}
+                onChange={(e) => setNewSectionDescription(e.target.value)}
+                rows={3}
+              />
+              <Button
+                className="w-full"
+                onClick={handleGenerateNewSection}
+                disabled={isGenerating || !newSectionTitle.trim()}
+              >
+                <PlusCircle className="h-4 w-4" />
+                {isGenerating ? 'Generating...' : 'Generate Section'}
+              </Button>
             </div>
-            <Separator />
-            {availableTemplates.length > 0 && (
+          </div>
+
+          {availableTemplates.length > 0 && (
+            <>
+              <Separator />
               <div>
-                <h4 className="text-xs font-medium text-muted-foreground mb-3">
+                <h4 className="text-xs font-medium text-muted-foreground mb-2">
                   Template Sections
                 </h4>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   {availableTemplates.map((template) => (
                     <Button
                       key={template.name}
                       variant="secondary"
-                      className="w-full justify-start"
+                      className="w-full justify-start h-auto py-2"
                       onClick={() => handleAddTemplateSection(template)}
                       disabled={isGenerating}
                     >
-                      <BookOpen className="w-4 h-4 mr-2" />
-                      <div className="text-left">
-                        <div className="font-medium">{template.name}</div>
-                        <div className="text-xs text-muted-foreground">{template.description}</div>
+                      <div className="flex items-center gap-3 min-w-0">
+                        <BookOpen className="h-4 w-4 flex-none" />
+                        <div className="flex-1 min-w-0 text-left">
+                          <div className="font-medium truncate">{template.name}</div>
+                          <div className="text-xs text-muted-foreground truncate">
+                            {template.description}
+                          </div>
+                        </div>
                       </div>
                     </Button>
                   ))}
                 </div>
               </div>
-            )}
-          </div>
-        </ScrollArea>
-      </div>
+            </>
+          )}
+        </div>
+      {/* </ScrollArea> */}
     </div>
   )
 }
