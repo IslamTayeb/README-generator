@@ -4,7 +4,8 @@ import cors from "cors";
 import { config } from "dotenv";
 import githubAuthRouter from "./routes/github-auth";
 import githubCodeFetchRouter from './routes/github-code-fetch';
-import githubSubmitRouter from './routes/github-submit'; // Add this line
+import githubSubmitRouter from './routes/github-submit';
+import sectionGenerationRouter from './routes/section-generation';
 import bodyParser from "body-parser";
 
 config();
@@ -35,7 +36,8 @@ app.use(
 app.use(express.json());
 app.use("/auth", githubAuthRouter);
 app.use('/api/github', githubCodeFetchRouter);
-app.use('/api/github', githubSubmitRouter); // Add this line
+app.use('/api/github', githubSubmitRouter);
+app.use('/api/sections', sectionGenerationRouter);
 app.use(bodyParser.json({limit: "200mb"}));
 app.use(bodyParser.urlencoded({limit: "200mb", extended: true }));
 app.use(bodyParser.text({ limit: '200mb' }));

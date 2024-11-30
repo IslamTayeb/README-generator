@@ -4,18 +4,14 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
 interface CustomSectionProps {
-  setSelectedSectionSlugs: React.Dispatch<React.SetStateAction<string[]>>
-  setFocusedSectionSlug: React.Dispatch<React.SetStateAction<string | null>>
-  setPageRefreshed: React.Dispatch<React.SetStateAction<boolean>>
-  setAddAction: React.Dispatch<React.SetStateAction<boolean>>
-  setTemplates: React.Dispatch<React.SetStateAction<any[]>>
+  setSelectedSectionSlugs: React.Dispatch<React.SetStateAction<string[]>>;
+  setFocusedSectionSlug: React.Dispatch<React.SetStateAction<string | null>>;
+  setTemplates: React.Dispatch<React.SetStateAction<any[]>>;
 }
 
 export const CustomSection: React.FC<CustomSectionProps> = ({
   setSelectedSectionSlugs,
   setFocusedSectionSlug,
-  setPageRefreshed,
-  setAddAction,
   setTemplates,
 }) => {
   const [customSectionName, setCustomSectionName] = useState('')
@@ -25,8 +21,6 @@ export const CustomSection: React.FC<CustomSectionProps> = ({
       const slug = `custom-${customSectionName.toLowerCase().replace(/\s+/g, '-')}`
       setSelectedSectionSlugs((prev) => [...prev, slug])
       setFocusedSectionSlug(slug)
-      setPageRefreshed(false)
-      setAddAction(true)
       setTemplates((prev) => [
         ...prev,
         {

@@ -1,266 +1,328 @@
-"use client"
 
-import React, { useEffect, useState } from 'react'
-import Image from 'next/image'
+import React, { useState, useRef, useCallback } from "react"
+import { SectionFilter } from "./section-filter"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
+import { Textarea } from "@/components/ui/textarea"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import { Separator } from "@/components/ui/separator"
+import { PlusCircle, BookOpen, GripVertical, X, MoreVertical } from 'lucide-react'
 import {
-  closestCenter,
-  DndContext,
-  KeyboardSensor,
-  MouseSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core'
-import { restrictToVerticalAxis } from '@dnd-kit/modifiers'
-import { arrayMove, SortableContext, sortableKeyboardCoordinates } from '@dnd-kit/sortable'
-import { SortableItem } from './sortable-item'
-import { CustomSection } from './custom-section'
-import { SectionFilter } from './section-filter.tsx'
-import { useLocalStorage } from 'usehooks-ts'
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import axios from "axios"
 
-const kebabCaseToTitleCase = (str: string) => {
-  return str
-    .split('-')
-    .map((word) => {
-      return word.slice(0, 1).toUpperCase() + word.slice(1)
-    })
-    .join(' ')
+interface Section {
+  slug: string
+  name: string
+  markdown: string
+  startLine: number
+  endLine: number
 }
 
 interface SectionsColumnProps {
-  selectedSectionSlugs: string[]
-  setSelectedSectionSlugs: React.Dispatch<React.SetStateAction<string[]>>
-  sectionSlugs: string[]
-  setSectionSlugs: React.Dispatch<React.SetStateAction<string[]>>
-  setFocusedSectionSlug: React.Dispatch<React.SetStateAction<string | null>>
-  focusedSectionSlug: string | null
-  templates: any[]
-  originalTemplate: any[]
-  setTemplates: React.Dispatch<React.SetStateAction<any[]>>
-  getTemplate: (slug: string) => any
-  darkMode: boolean
+  sections: Section[]
+  onSectionsChange: (sections: Section[], updatedMarkdown?: string) => void
+  repoUrl: string
+  currentMarkdown: string
 }
 
-export const SectionsColumn: React.FC<SectionsColumnProps> = ({
-  selectedSectionSlugs,
-  setSelectedSectionSlugs,
-  sectionSlugs,
-  setSectionSlugs,
-  setFocusedSectionSlug,
-  focusedSectionSlug,
-  templates,
-  originalTemplate,
-  setTemplates,
-  getTemplate,
-  darkMode,
-}) => {
-  const sensors = useSensors(
-    useSensor(MouseSensor),
-    useSensor(TouchSensor),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  )
+export const templateSections = [
+  { name: 'Features', description: 'List of key features and capabilities' },
+  { name: 'Installation', description: 'Step-by-step installation guide' },
+  { name: 'Configuration', description: 'Configuration options and setup' },
+  { name: 'API Documentation', description: 'API endpoints and usage' },
+  { name: 'Contributing', description: 'Guidelines for contributors' },
+  { name: 'Testing', description: 'Testing procedures and frameworks' },
+  { name: 'Security', description: 'Security features and considerations' },
+  { name: 'Troubleshooting', description: 'Common issues and solutions' },
+]
 
-  const [pageRefreshed, setPageRefreshed] = useState(false)
-  const [addAction, setAddAction] = useState(false)
+export function SectionsColumn({ sections, onSectionsChange, repoUrl, currentMarkdown }: SectionsColumnProps) {
   const [searchFilter, setSearchFilter] = useState('')
-  const [filteredSlugs, setFilteredSlugs] = useState<string[]>([])
-  const { saveBackup, deleteBackup } = useLocalStorage()
+  const [focusedSectionSlug, setFocusedSectionSlug] = useState<string | null>(null)
+  const [newSectionTitle, setNewSectionTitle] = useState('')
+  const [newSectionDescription, setNewSectionDescription] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [draggedItem, setDraggedItem] = useState<Section | null>(null)
+  const [dropIndicatorIndex, setDropIndicatorIndex] = useState<number | null>(null)
+  const dragOverItem = useRef<string | null>(null)
 
-  useEffect(() => {
-    const slugsFromPreviousSession = localStorage.getItem('current-slug-list') || 'title-and-description'
-    if (slugsFromPreviousSession.length > 0) {
-      setPageRefreshed(true)
-      const slugList = slugsFromPreviousSession.includes(',') ? slugsFromPreviousSession.split(',') : [slugsFromPreviousSession]
-      setSectionSlugs((prev) => prev.filter((s) => !slugList.includes(s)))
-      setSelectedSectionSlugs(slugList)
-      setFocusedSectionSlug(slugList[0])
-      localStorage.setItem('current-focused-slug', slugList[0])
+  const handleDragStart = (e: React.DragEvent<HTMLLIElement>, section: Section) => {
+    setDraggedItem(section)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', section.slug)
+    const target = e.target as HTMLElement
+    setTimeout(() => {
+      target.style.opacity = '0.5'
+    }, 0)
+  }
+
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLLIElement>, targetSlug: string, index: number) => {
+    e.preventDefault()
+    dragOverItem.current = targetSlug
+    const rect = e.currentTarget.getBoundingClientRect()
+    const midpoint = rect.top + rect.height / 2
+    if (e.clientY < midpoint) {
+      setDropIndicatorIndex(index)
+    } else {
+      setDropIndicatorIndex(index + 1)
     }
   }, [])
 
-  const onAddSection = (section: string) => {
-    localStorage.setItem('current-focused-slug', section)
-    setPageRefreshed(false)
-    setAddAction(true)
-    setSectionSlugs((prev) => prev.filter((slug) => slug !== section))
-    setFilteredSlugs((prev) => prev.filter((slug) => slug !== section))
-    setSelectedSectionSlugs((prev) => [...prev, section])
-    setFocusedSectionSlug(section)
-    setSearchFilter('')
-  }
+  const handleDragEnd = (e: React.DragEvent<HTMLLIElement>) => {
+    e.preventDefault();
+    const target = e.target as HTMLElement;
+    target.style.opacity = '1';
 
-  useEffect(() => {
-    localStorage.setItem('current-slug-list', selectedSectionSlugs.join(','))
-  }, [selectedSectionSlugs])
+    if (draggedItem && dragOverItem.current && draggedItem.slug !== dragOverItem.current) {
+      // Create new sections array with updated order
+      const newSections = [...sections];
+      const draggedIndex = newSections.findIndex(section => section.slug === draggedItem.slug);
+      const targetIndex = newSections.findIndex(section => section.slug === dragOverItem.current);
 
-  const handleDragEnd = (event: any) => {
-    const { active, over } = event
-    if (active.id !== over.id) {
-      setSelectedSectionSlugs((sections) => {
-        const oldIndex = sections.findIndex((s) => s === active.id)
-        const newIndex = sections.findIndex((s) => s === over.id)
-        return arrayMove(sections, oldIndex, newIndex)
-      })
+      // Remove dragged item
+      newSections.splice(draggedIndex, 1);
+
+      // Insert at new position
+      newSections.splice(dropIndicatorIndex as number, 0, draggedItem);
+
+      // Update the markdown and sections only after drag is complete
+      onSectionsChange(newSections);
     }
-  }
+
+    setDraggedItem(null);
+    dragOverItem.current = null;
+    setDropIndicatorIndex(null);
+  };
 
   const onDeleteSection = (sectionSlug: string) => {
-    setSelectedSectionSlugs((prev) => prev.filter((s) => s !== sectionSlug))
-    setSectionSlugs((prev) => [...prev, sectionSlug])
+    const newSections = sections.filter(s => s.slug !== sectionSlug)
+    onSectionsChange(newSections)
     setFocusedSectionSlug(null)
-    localStorage.setItem('current-focused-slug', 'noEdit')
   }
 
-  const onResetSection = (sectionSlug: string) => {
-    let originalSection
+  const handleGenerateNewSection = async () => {
+    if (!newSectionTitle.trim()) return
 
-    if (sectionSlug.slice(0, 6) === 'custom') {
-      const sectionTitle = kebabCaseToTitleCase(sectionSlug.slice(6))
-      originalSection = {
-        slug: sectionSlug,
-        name: sectionTitle,
-        markdown: `## ${sectionTitle}`,
+    setIsGenerating(true)
+    try {
+      const response = await axios.post('http://localhost:3001/api/sections/generate-section', {
+        title: newSectionTitle,
+        description: newSectionDescription,
+        repoUrl,
+        currentMarkdown,
+      }, {
+        withCredentials: true,
+      })
+
+      if (response.data.section) {
+        const newContent = response.data.section
+        const updatedMarkdown = currentMarkdown +
+          (currentMarkdown.endsWith('\n\n') ? '' : '\n\n') +
+          newContent
+
+        const newSection = {
+          slug: `section-${newSectionTitle.toLowerCase().replace(/[^\w]+/g, '-')}`,
+          name: newSectionTitle,
+          markdown: newContent,
+          startLine: currentMarkdown.split('\n').length + 1,
+          endLine: updatedMarkdown.split('\n').length,
+        }
+
+        const updatedSections = [...sections, newSection]
+        onSectionsChange(updatedSections, updatedMarkdown)
       }
-    } else {
-      originalSection = originalTemplate.find((s) => s.slug === sectionSlug)
+    } catch (error) {
+      console.error('Failed to generate new section:', error)
+    } finally {
+      setIsGenerating(false)
+      setNewSectionTitle('')
+      setNewSectionDescription('')
     }
-
-    const newTemplates = templates.map((s) => {
-      if (s.slug === originalSection.slug) {
-        return originalSection
-      }
-      return s
-    })
-    setTemplates(newTemplates)
-    saveBackup(newTemplates)
   }
 
-  const resetSelectedSections = () => {
-    const sectionResetConfirmed = window.confirm(
-      'All sections of your readme will be removed; to continue, click OK'
+  const handleAddTemplateSection = async (template: typeof templateSections[0]) => {
+    setIsGenerating(true)
+    try {
+      const response = await axios.post('http://localhost:3001/api/sections/generate-template-section', {
+        template: template.name,
+        repoUrl,
+        currentMarkdown,
+      }, {
+        withCredentials: true,
+      })
+
+      if (response.data.section) {
+        const newContent = response.data.section
+        const updatedMarkdown = currentMarkdown +
+          (currentMarkdown.endsWith('\n\n') ? '' : '\n\n') +
+          newContent
+
+        const newSection = {
+          slug: `section-${template.name.toLowerCase().replace(/[^\w]+/g, '-')}`,
+          name: template.name,
+          markdown: newContent,
+          startLine: currentMarkdown.split('\n').length + 1,
+          endLine: updatedMarkdown.split('\n').length,
+        }
+
+        const updatedSections = [...sections, newSection]
+        onSectionsChange(updatedSections, updatedMarkdown)
+      }
+    } catch (error) {
+      console.error('Failed to generate template section:', error)
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  const filteredSections = sections.filter(section =>
+    section.name.toLowerCase().includes(searchFilter.toLowerCase())
+  )
+
+  const availableTemplates = templateSections.filter(template =>
+    !sections.some(section =>
+      section.name.toLowerCase() === template.name.toLowerCase()
     )
-    if (sectionResetConfirmed) {
-      setSectionSlugs((prev) => [...prev, ...selectedSectionSlugs.filter((s) => s !== 'title-and-description')])
-      setSelectedSectionSlugs(['title-and-description'])
-      setFocusedSectionSlug('title-and-description')
-      localStorage.setItem('current-focused-slug', 'noEdit')
-      setTemplates(originalTemplate)
-      deleteBackup()
-    }
-  }
-
-  useEffect(() => {
-    setFocusedSectionSlug(localStorage.getItem('current-focused-slug') || null)
-  }, [focusedSectionSlug])
-
-  const alphabetizedSectionSlugs = sectionSlugs.sort()
-
-  useEffect(() => {
-    if (!searchFilter) {
-      setFilteredSlugs([])
-      return
-    }
-
-    const suggestedSlugs = sectionSlugs.filter((slug) => {
-      return getTemplate(slug).name.toLowerCase().includes(searchFilter.toLowerCase())
-    })
-
-    setFilteredSlugs(suggestedSlugs.length ? suggestedSlugs : [])
-  }, [searchFilter, sectionSlugs, getTemplate])
+  )
 
   return (
-    <div className="sections w-80 border-r border-border">
-      <h3 className="px-4 py-2 text-sm font-medium border-b border-border">
-        Sections
-        <button
-          className="float-right focus:outline-none"
-          type="button"
-          onClick={resetSelectedSections}
-        >
-          <span className="sr-only">Reset sections</span>
-          <Image
-            className="w-auto h-5 inline-block"
-            src={darkMode ? '/reset-light.svg' : '/reset.svg'}
-            alt="Reset"
-            width={16}
-            height={16}
-          />
-        </button>
-      </h3>
-      <div className="px-4 py-4 overflow-y-auto h-full">
-        {selectedSectionSlugs.length > 0 && (
-          <h4 className="mb-3 text-xs text-muted-foreground">
-            Click to edit
-          </h4>
-        )}
-        <ul className="mb-6 space-y-2">
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-            modifiers={[restrictToVerticalAxis]}
-          >
-            <SortableContext items={selectedSectionSlugs}>
-              {selectedSectionSlugs.map((s) => {
-                const template = getTemplate(s)
-                if (template) {
-                  return (
-                    <SortableItem
-                      key={s}
-                      id={s}
-                      section={template}
-                      focusedSectionSlug={focusedSectionSlug}
-                      setFocusedSectionSlug={setFocusedSectionSlug}
-                      onDeleteSection={onDeleteSection}
-                      onResetSection={onResetSection}
-                    />
-                  )
-                }
-                return null
-              })}
-            </SortableContext>
-          </DndContext>
-        </ul>
+    <div className="flex flex-col h-full border-r border-border bg-card">
+      <div className="p-4 border-b">
+        <h3 className="text-sm font-medium">Sections</h3>
+      </div>
 
-        {sectionSlugs.length > 0 && (
-          <h4 className="mb-3 text-xs text-muted-foreground">
-            Click to add
-          </h4>
-        )}
-        <SectionFilter searchFilter={searchFilter} setSearchFilter={setSearchFilter} />
-        <CustomSection
-          setSelectedSectionSlugs={setSelectedSectionSlugs}
-          setFocusedSectionSlug={setFocusedSectionSlug}
-          setPageRefreshed={setPageRefreshed}
-          setAddAction={setAddAction}
-          setTemplates={setTemplates}
-        />
-        <ul className="mb-6 space-y-2">
-          {(filteredSlugs.length ? filteredSlugs : alphabetizedSectionSlugs).map((s) => {
-            const template = getTemplate(s)
-            if (template) {
-              return (
-                <li key={s}>
-                  <button
-                    className="flex items-center w-full py-2 px-3 text-sm bg-secondary hover:bg-secondary/80 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
-                    type="button"
-                    onClick={() => onAddSection(s)}
-                  >
-                    <span>{template.name}</span>
-                  </button>
-                </li>
-              )
-            }
-            return null
-          })}
-          {searchFilter && !filteredSlugs.length && (
-            <li className="text-xs text-muted-foreground">
-              No matching sections found
-            </li>
-          )}
-        </ul>
+      <div className="">
+        <ScrollArea className="">
+          <div className="p-4 space-y-4 contents">
+            <div>
+              <h4 className="text-xs font-medium text-muted-foreground mb-3">
+                Document Sections
+              </h4>
+              <SectionFilter
+                searchFilter={searchFilter}
+                setSearchFilter={setSearchFilter}
+              />
+              <ul className="space-y-2 relative">
+                {dropIndicatorIndex === 0 && (
+                  <div className="absolute top-0 left-0 right-0 h-0.5 bg-primary -translate-y-1/2" />
+                )}
+                {filteredSections.map((section, index) => (
+                  <React.Fragment key={section.slug}>
+                    <li
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, section)}
+                      onDragOver={(e) => handleDragOver(e, section.slug, index)}
+                      onDragEnd={handleDragEnd}
+                      className={`relative flex items-center bg-secondary rounded-md ${focusedSectionSlug === section.slug ? 'ring-2 ring-primary' : ''
+                        }`}
+                    >
+                      <button
+                        className="flex-grow px-4 py-1.5 text-left focus:outline-none text-sm"
+                        onClick={() => setFocusedSectionSlug(section.slug)}
+                      >
+                        {section.name}
+                      </button>
+                      <div className="flex items-center pr-2 space-x-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={() => onDeleteSection(section.slug)}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8"
+                            >
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem>Edit</DropdownMenuItem>
+                            <DropdownMenuItem>Duplicate</DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={() => onDeleteSection(section.slug)}
+                            >
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                        <div className="cursor-move p-2">
+                          <GripVertical className="h-4 w-4" />
+                        </div>
+                      </div>
+                    </li>
+                    {dropIndicatorIndex === index + 1 && (
+                      <div className="h-0.5 bg-primary w-full" />
+                    )}
+                  </React.Fragment>
+                ))}
+              </ul>
+            </div>
+            <Separator />
+            <div>
+              <h4 className="text-xs font-medium text-muted-foreground mb-3">
+                Create Custom Section
+              </h4>
+              <div className="space-y-2">
+                <Input
+                  placeholder="Section title"
+                  value={newSectionTitle}
+                  onChange={(e) => setNewSectionTitle(e.target.value)}
+                />
+                <Textarea
+                  placeholder="Description (optional)"
+                  value={newSectionDescription}
+                  onChange={(e) => setNewSectionDescription(e.target.value)}
+                  rows={3}
+                />
+                <Button
+                  className="w-full"
+                  onClick={handleGenerateNewSection}
+                  disabled={isGenerating || !newSectionTitle.trim()}
+                >
+                  <PlusCircle className="w-4 h-4 mr-2" />
+                  {isGenerating ? 'Generating...' : 'Generate Section'}
+                </Button>
+              </div>
+            </div>
+            <Separator />
+            {availableTemplates.length > 0 && (
+              <div>
+                <h4 className="text-xs font-medium text-muted-foreground mb-3">
+                  Template Sections
+                </h4>
+                <div className="space-y-2">
+                  {availableTemplates.map((template) => (
+                    <Button
+                      key={template.name}
+                      variant="secondary"
+                      className="w-full justify-start"
+                      onClick={() => handleAddTemplateSection(template)}
+                      disabled={isGenerating}
+                    >
+                      <BookOpen className="w-4 h-4 mr-2" />
+                      <div className="text-left">
+                        <div className="font-medium">{template.name}</div>
+                        <div className="text-xs text-muted-foreground">{template.description}</div>
+                      </div>
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
       </div>
     </div>
   )
