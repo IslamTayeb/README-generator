@@ -2,7 +2,6 @@ import express, { Request, Response } from 'express';
 import axios from 'axios';
 import { config } from 'dotenv';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import pdf from 'pdf-parse';
 import fs from 'fs/promises';
 import path from 'path';
 import { countTokens } from '@anthropic-ai/tokenizer';
@@ -41,32 +40,8 @@ const fetchRepoTree = async (owner: string, repo: string, accessToken: string): 
   return response.data.tree;
 };
 
-// Function to fetch specific file content
-const fetchFileContent = async (owner: string, repo: string, fileSha: string, accessToken: string): Promise<string> => {
-  const url = `https://api.github.com/repos/${owner}/${repo}/git/blobs/${fileSha}`;
-  console.log(`Fetching content for file from URL: ${url}`);
-  const response = await axios.get(url, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      Accept: 'application/vnd.github.v3.raw',
-    },
-    responseType: 'arraybuffer', // Important for handling PDFs
-  });
-
-  // Check if response is PDF
-  const isPdf = response.headers['content-type']?.includes('application/pdf');
-  if (isPdf) {
-    return extractPdfContent(response.data);
-  }
-
-  // Handle non-PDF content
-  return typeof response.data === 'string'
-    ? response.data
-    : Buffer.from(response.data).toString('utf-8');
-};
-
 // Function to convert Jupyter Notebook (.ipynb) files to markdown
-const convertIpynbToMarkdown = (content: string | object): string => {
+const convertIpynbToMarkdown = (content: string | object, truncateOutputs: boolean = false): string => {
   try {
     let notebook;
     if (typeof content === 'string') {
@@ -78,10 +53,51 @@ const convertIpynbToMarkdown = (content: string | object): string => {
     let markdown = '# Jupyter Notebook Conversion\n';
     if (notebook.cells) {
       for (const cell of notebook.cells) {
+        // Handle markdown cells
         if (cell.cell_type === 'markdown') {
           markdown += cell.source.join('') + '\n\n';
-        } else if (cell.cell_type === 'code') {
+        }
+        // Handle code cells
+        else if (cell.cell_type === 'code') {
+          // Add the code
           markdown += '```python\n' + cell.source.join('') + '\n```\n\n';
+
+          // Handle outputs if they exist
+          if (cell.outputs && cell.outputs.length > 0) {
+            markdown += 'Output:\n```\n';
+
+            for (const output of cell.outputs) {
+              if (output.output_type === 'stream' && output.text) {
+                const text = output.text.join('');
+                if (truncateOutputs) {
+                  // Get first 2 lines of output
+                  const lines = text.split('\n').slice(0, 2);
+                  markdown += lines.join('\n');
+                  if (text.split('\n').length > 2) {
+                    markdown += '\n... [output truncated]\n';
+                  }
+                } else {
+                  markdown += text;
+                }
+              }
+              else if (output.output_type === 'execute_result' && output.data && output.data['text/plain']) {
+                const text = Array.isArray(output.data['text/plain'])
+                  ? output.data['text/plain'].join('')
+                  : output.data['text/plain'];
+
+                if (truncateOutputs) {
+                  const lines = text.split('\n').slice(0, 2);
+                  markdown += lines.join('\n');
+                  if (text.split('\n').length > 2) {
+                    markdown += '\n... [output truncated]\n';
+                  }
+                } else {
+                  markdown += text;
+                }
+              }
+            }
+            markdown += '\n```\n\n';
+          }
         }
       }
     } else {
@@ -94,23 +110,39 @@ const convertIpynbToMarkdown = (content: string | object): string => {
   }
 };
 
-const extractPdfContent = async (buffer: Buffer): Promise<string> => {
-  try {
-    const data = await pdf(buffer);
-    return data.text;
-  } catch (err) {
-    console.error('Failed to parse PDF:', err);
-    return '# Error in parsing PDF\n';
-  }
+// Modified fetchFileContent function to include truncation option
+const fetchFileContent = async (
+  owner: string,
+  repo: string,
+  fileSha: string,
+  accessToken: string,
+  truncateNotebookOutputs: boolean = true
+): Promise<string> => {
+  const url = `https://api.github.com/repos/${owner}/${repo}/git/blobs/${fileSha}`;
+  console.log(`Fetching content for file from URL: ${url}`);
+
+  const response = await axios.get(url, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: 'application/vnd.github.v3.raw',
+    },
+    responseType: 'arraybuffer',
+  });
+
+  const content = typeof response.data === 'string'
+    ? response.data
+    : Buffer.from(response.data).toString('utf-8');
+
+  return content;
 };
 
 // Function to determine if a file should be included
 const shouldIncludeFile = (filePath: string, size: number): boolean => {
   const ignoredExtensions = [
-    '.csv', '.json', '.tsv', '.xls', '.xlsx', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.mp4', '.avi', '.mkv', '.mov', '.webm', '.wmv', '.mp3', '.wav', '.flac', '.log', '.DS_Store', '.zip', '.gz', '.tar', '.7z', '.rar', '.mjs', '.ts', '.ico', '.txt'
+    '.csv', '.json', '.tsv', '.xls', '.xlsx', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.mp4', '.avi', '.mkv', '.mov', '.webm', '.wmv', '.mp3', '.wav', '.flac', '.log', '.DS_Store', '.zip', '.gz', '.tar', '.7z', '.rar', '.mjs', '.ts', '.ico', '.txt', '.pdf'
   ];
   const ignoredDirectories = [
-    'node_modules/', 'dist/', 'venv/', 'env/', '.git/', '.vscode/', '.gitignore', '.env', '.gitattributes', '.python-version', '.venv', 'yarn.lock', 'package-lock.json', 'hooks', '.next',
+    'node_modules/', 'dist/', 'venv/', 'env/', '.git/', '.vscode/', '.gitignore', '.env', '.gitattributes', '.python-version', '.venv', 'yarn.lock', 'package-lock.json', 'hooks', '.next', 'resume'
   ];
   const maxFileSize = 1000000;
 
@@ -240,7 +272,7 @@ Format the response in proper Markdown with clear sections, code blocks where ap
 // Endpoint to generate README from selected files
 router.post('/generate-readme', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { repoUrl, selectedFiles } = req.body;
+    const { repoUrl, selectedFiles, truncateNotebookOutputs = true } = req.body;  // Add truncateNotebookOutputs parameter
     if (!repoUrl || !selectedFiles) {
       res.status(400).json({ error: 'Missing required parameters' });
       return;
@@ -264,7 +296,7 @@ router.post('/generate-readme', async (req: Request, res: Response): Promise<voi
           let content = await fetchFileContent(owner, repo, fileNode.sha, accessToken);
 
           if (filePath.endsWith('.ipynb')) {
-            content = convertIpynbToMarkdown(content);
+            content = convertIpynbToMarkdown(content, truncateNotebookOutputs);
           }
 
           filesContent += `

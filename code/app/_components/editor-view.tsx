@@ -245,7 +245,15 @@ export function EditorView({ repoUrl, markdown, setMarkdown }: EditorViewProps) 
         </div>
       ) : (
         <div className="flex flex-1 overflow-hidden">
-          <div className="w-[20%] overflow-auto !block">
+          <div className="w-[20%] overflow-auto bg-card border-r border-border
+            [&::-webkit-scrollbar-track]:shadow-[inset_0_0_0_0_hsl(var(--primary)_/_0.00)]
+            [&::-webkit-scrollbar]:w-[4px]
+            [&::-webkit-scrollbar-thumb]:bg-secondary/25
+            [&::-webkit-scrollbar-thumb]:rounded-full
+            [&::-webkit-scrollbar-thumb]:transition-opacity
+            [&::-webkit-scrollbar]:bg-card
+            hover:[&::-webkit-scrollbar-thumb]:bg-secondary/50"
+          >
             <SectionsColumn
               sections={sections}
               activeSection={activeSection}

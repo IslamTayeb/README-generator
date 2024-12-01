@@ -162,11 +162,16 @@ export function SectionsColumn({
     section.name.toLowerCase().includes(searchFilter.toLowerCase())
   )
 
-  const availableTemplates = templateSections.filter(template =>
-    !sections.some(section =>
-      section.name.toLowerCase() === template.name.toLowerCase()
-    )
-  )
+  const availableTemplates = templateSections.filter(template => {
+    // Convert template name to lowercase for case-insensitive comparison
+    const templateName = template.name.toLowerCase();
+
+    // Check if this template's name appears in any section's name
+    return !sections.some(section =>
+      // Convert section name to lowercase and check if it includes the template name
+      section.name.toLowerCase().includes(templateName)
+    );
+  });
 
   const handleRenameSection = (section: Section, newName: string) => {
     const updatedSection = {
@@ -179,28 +184,19 @@ export function SectionsColumn({
       s.slug === section.slug ? updatedSection : s
     );
 
-    // Check if the new name conflicts with template sections
-    const isTemplateSection = templateSections.some(
-      template => template.name.toLowerCase() === newName.toLowerCase()
-    );
-
-    // If renamed to match a template section, mark that template as used
-    if (isTemplateSection) {
-      const updatedMarkdown = newSections.map(section => section.markdown).join('\n\n');
-      onSectionsChange(newSections, updatedMarkdown);
-    } else {
-      onSectionsChange(newSections);
-    }
+    // No need to check for exact matches anymore
+    // Just update the sections with the new name
+    onSectionsChange(newSections);
   };
 
   return (
-    <div className="flex flex-col h-full border-r border-border bg-card w-full">
-      <div className="flex-none p-3 border-b">
-        <h3 className="text-sm font-medium">Sections</h3>
-      </div>
+    <div className="flex flex-col w-full overflow-x-hidden">
+      {/* <div className="flex-none overflow-y-hidden text-xl font-bold p-4 text-foreground bg-card border-b ">
+        <h3 className="">Sections</h3>
+      </div> */}
 
-      <div className="p-3 space-y-4">
-        <h4 className="text-xs font-medium text-muted-foreground mb-2">
+      <div className="p-3 space-y-4 overflow-auto">
+        <h4 className="text-sm font-medium text-muted-foreground my-2">
           Document Sections
         </h4>
         <SectionFilter
@@ -234,7 +230,7 @@ export function SectionsColumn({
         <Separator />
 
         <div>
-          <h4 className="text-xs font-medium text-muted-foreground mb-2">
+          <h4 className="text-sm font-medium text-muted-foreground my-2">
             Create Custom Section
           </h4>
           <div className="space-y-2">
@@ -255,17 +251,21 @@ export function SectionsColumn({
               disabled={isGenerating || !newSectionTitle.trim()}
             >
               <PlusCircle className="h-4 w-4 mr-2" />
-              {isGenerating ? 'Generating...' : 'Generate Section'}
+              {isGenerating ? (
+                <span className="truncate">Generating...</span>
+              ) : (
+                <span className="truncate">Generate Section</span>
+              )}
             </Button>
           </div>
         </div>
 
         {availableTemplates.length > 0 && (
           <>
-            <Separator />
+            <Separator className="" />
             <div>
-              <h4 className="text-xs font-medium text-muted-foreground mb-2">
-                Template Sections
+            <h4 className="text-sm font-medium text-muted-foreground my-2">
+            Template Sections
               </h4>
               <div className="space-y-1.5">
                 {availableTemplates.map((template) => (

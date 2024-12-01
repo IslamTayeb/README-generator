@@ -35,7 +35,7 @@ interface TreeNode {
   children: Record<string, TreeNode>;
 }
 
-const MAX_FILES = 20;
+const MAX_FILES = 10;
 
 export function FileTree({
   files,
