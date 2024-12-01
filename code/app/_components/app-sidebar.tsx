@@ -4,13 +4,14 @@ import React from "react"
 import { Plus, History, User } from 'lucide-react'
 import {
   Sidebar,
-  SidebarContent,
+  SidebarContent as BaseSidebarContent,
   SidebarFooter,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  useSidebar,
 } from "@/components/ui/sidebar"
 import {
   DropdownMenu,
@@ -23,6 +24,7 @@ import {
   Tooltip,
   TooltipProvider,
 } from "@/components/ui/tooltip"
+import { cn } from "@/lib/utils"
 
 interface Project {
   id: string
@@ -37,19 +39,27 @@ interface AppSidebarProps {
   onNewProject: () => void;
   onAuthenticate: () => void;
   onNavigateToEditor: (repoUrl: string) => void;
-  collapsed: boolean;
+  isEditorMode: boolean;
+  collapsed?: boolean;
 }
 
-export function AppSidebar({
+function SidebarContents({
   isAuthenticated,
   projects,
   onNewProject,
   onAuthenticate,
   onNavigateToEditor,
+  isEditorMode,
 }: AppSidebarProps) {
   return (
     <TooltipProvider delayDuration={0}>
-      <Sidebar collapsible="icon" className="bg-card flex flex-col">
+      <Sidebar
+        collapsible="icon"
+        className={cn(
+          "bg-card flex flex-col",
+          isEditorMode ? "data-[state=collapsed]" : ""
+        )}
+      >
         <SidebarHeader>
           <SidebarMenu>
             <SidebarMenuItem>
@@ -67,7 +77,7 @@ export function AppSidebar({
 
         <Separator className="w-11/12 my-1.5 mb-3.5 mx-auto group-data-[collapsible=icon]:hidden" />
 
-        <SidebarContent className="px-2 group-data-[collapsible=icon]:hidden flex-grow">
+        <BaseSidebarContent className="px-2 group-data-[collapsible=icon]:hidden flex-grow">
           <span className="text-[10px] uppercase font-bold text-primary opacity-50">
             Past Projects
           </span>
@@ -89,7 +99,7 @@ export function AppSidebar({
               </SidebarMenuItem>
             </SidebarMenu>
           ))}
-        </SidebarContent>
+        </BaseSidebarContent>
 
         <SidebarFooter className="mt-auto">
           <SidebarMenu>
@@ -126,5 +136,9 @@ export function AppSidebar({
         <SidebarRail />
       </Sidebar>
     </TooltipProvider>
-  )
+  );
+}
+
+export function AppSidebar(props: AppSidebarProps) {
+  return <SidebarContents {...props} />;
 }

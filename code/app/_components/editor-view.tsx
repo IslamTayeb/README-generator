@@ -8,6 +8,7 @@ import { FileTree } from "./editing/file-tree"
 import { SectionsColumn } from "./sections/sections-column"
 import axios from "axios"
 import { debounce } from 'lodash';
+import { editor } from "monaco-editor"
 
 interface FileTreeItem {
   path: string;
@@ -39,116 +40,107 @@ export function EditorView({ repoUrl, markdown, setMarkdown }: EditorViewProps) 
   const [files, setFiles] = useState<FileTreeItem[]>([]);
   const [preSelectedFiles, setPreSelectedFiles] = useState<string[]>([]);
   const [sections, setSections] = useState<Section[]>([]);
-  const [previewMarkdown, setPreviewMarkdown] = useState(markdown);
+  const [activeSection, setActiveSection] = useState<Section | null>(null);
+  const [activeSectionContent, setActiveSectionContent] = useState('');
+  const [fullMarkdown, setFullMarkdown] = useState(markdown);
+  const editorRef = React.useRef<editor.IStandaloneCodeEditor | null>(null);
 
   const extractSections = (content: string): Section[] => {
     const lines = content.split('\n');
     const sections: Section[] = [];
     let currentSection: Section | null = null;
+    let inCodeBlock = false;
 
-    lines.forEach((line, index) => {
+    const isActualHeading = (line: string, prevLine: string | undefined) => {
       const headingMatch = line.match(/^(#{1,2})\s+(.+)$/);
+      if (!headingMatch) return false;
+      if (inCodeBlock) return false;
+      const commonListWords = /^#{1,2}\s+(or|and|vs|versus)$/i;
+      if (commonListWords.test(line)) return false;
+      if (prevLine !== undefined && prevLine.trim() !== '') return false;
+      return true;
+    };
 
-      if (headingMatch) {
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const prevLine = i > 0 ? lines[i - 1] : undefined;
+
+      if (line.trim().startsWith('```')) {
+        inCodeBlock = !inCodeBlock;
+      }
+
+      if (isActualHeading(line, prevLine)) {
         if (currentSection) {
-          currentSection.endLine = index - 1;
+          currentSection.markdown = lines.slice(currentSection.startLine, i).join('\n');
+          currentSection.endLine = i - 1;
           sections.push(currentSection);
         }
 
-        const level = headingMatch[1].length;
-        const title = headingMatch[2];
-        const slug = `section-${title.toLowerCase().replace(/[^\w]+/g, '-')}`;
-
+        const [, , title] = line.match(/^(#{1,2})\s+(.+)$/)!;
         currentSection = {
-          slug,
+          slug: `section-${title.toLowerCase().replace(/[^\w]+/g, '-')}`,
           name: title,
-          markdown: lines.slice(index).join('\n'),
-          startLine: index,
+          markdown: '',
+          startLine: i,
           endLine: lines.length - 1,
         };
       }
-    });
+    }
 
     if (currentSection) {
+      currentSection.markdown = lines.slice(currentSection.startLine).join('\n');
+      currentSection.endLine = lines.length - 1;
       sections.push(currentSection);
     }
 
     return sections;
   };
 
-  const updateMarkdownFromSections = (orderedSections: Section[]) => {
-    const lines = markdown.split('\n');
-    let newLines: string[] = [];
+  const debouncedUpdateSection = useCallback(
+    debounce((newContent: string) => {
+      if (activeSection) {
+        const updatedSections = sections.map(section => {
+          if (section.slug === activeSection.slug) {
+            return {
+              ...section,
+              markdown: newContent
+            };
+          }
+          return section;
+        });
 
-    orderedSections.forEach((section, index) => {
-      const sectionLines = lines.slice(section.startLine, section.endLine + 1);
-      newLines.push(...sectionLines);
-
-      if (index < orderedSections.length - 1) {
-        newLines.push('', '');
+        const newFullMarkdown = updatedSections.map(s => s.markdown).join('\n\n');
+        setFullMarkdown(newFullMarkdown);
+        setMarkdown(newFullMarkdown);
+        setSections(updatedSections);
       }
-    });
+    }, 300),
+    [activeSection, sections, setMarkdown]
+  );
 
-    setMarkdown(newLines.join('\n'));
+  const handleSectionSelect = (section: Section) => {
+    setActiveSection(section);
+    setActiveSectionContent(section.markdown);
+  };
+
+  const handleMarkdownChange = (newValue: string) => {
+    setActiveSectionContent(newValue);
+    debouncedUpdateSection(newValue);
   };
 
   const handleSectionsChange = (newSections: Section[], updatedMarkdown?: string) => {
     if (updatedMarkdown) {
+      setFullMarkdown(updatedMarkdown);
       setMarkdown(updatedMarkdown);
       const extractedSections = extractSections(updatedMarkdown);
       setSections(extractedSections);
     } else {
-      updateMarkdownFromSections(newSections);
+      const newFullMarkdown = newSections.map(section => section.markdown).join('\n\n');
+      setFullMarkdown(newFullMarkdown);
+      setMarkdown(newFullMarkdown);
       setSections(newSections);
     }
   };
-
-  const updateSectionsFromMarkdown = () => {
-    const extractedSections = extractSections(markdown);
-    setSections(extractedSections);
-  };
-
-  const debouncedSetPreview = useCallback(
-    debounce((value: string) => {
-      setPreviewMarkdown(value);
-    }, 500),
-    []
-  );
-
-  const debouncedCheckHeadings = useCallback(
-    debounce((value: string) => {
-      const currentHeadings = sections.map(s => s.name);
-      const lines = value.split('\n');
-      const newHeadings = lines
-        .filter(line => line.match(/^(#{1,2})\s+(.+)$/))
-        .map(line => line.match(/^(#{1,2})\s+(.+)$/)![2]);
-
-      if (JSON.stringify(currentHeadings) !== JSON.stringify(newHeadings)) {
-        const extractedSections = extractSections(value);
-        setSections(extractedSections);
-      }
-    }, 500),
-    [sections]
-  );
-
-  const handleMarkdownChange = (newValue: string) => {
-    setMarkdown(newValue);
-    debouncedSetPreview(newValue);
-    debouncedCheckHeadings(newValue);
-  };
-
-  useEffect(() => {
-    return () => {
-      debouncedSetPreview.cancel();
-      debouncedCheckHeadings.cancel();
-    };
-  }, [debouncedSetPreview, debouncedCheckHeadings]);
-
-  useEffect(() => {
-    if (markdown && sections.length === 0) {
-      updateSectionsFromMarkdown();
-    }
-  }, [showFileTree]);
 
   const fetchRepositoryTree = async () => {
     try {
@@ -158,9 +150,7 @@ export function EditorView({ repoUrl, markdown, setMarkdown }: EditorViewProps) 
         `http://localhost:3001/api/github/fetch-tree?repoUrl=${encodedRepoUrl}`,
         {
           withCredentials: true,
-          headers: {
-            Accept: "application/json",
-          },
+          headers: { Accept: "application/json" },
         }
       );
 
@@ -175,36 +165,33 @@ export function EditorView({ repoUrl, markdown, setMarkdown }: EditorViewProps) 
     }
   };
 
-  const handleFileSelection = async (
-    selectedFiles: string[],
-    selectedDirectories: string[]
-  ) => {
+  const handleFileSelection = async (selectedFiles: string[], selectedDirectories: string[]) => {
     try {
       setLoading(true);
       const encodedRepoUrl = encodeURIComponent(repoUrl);
       const response = await axios.post(
         "http://localhost:3001/api/github/generate-readme",
-        {
-          repoUrl: encodedRepoUrl,
-          selectedFiles,
-        },
+        { repoUrl: encodedRepoUrl, selectedFiles },
         {
           withCredentials: true,
           onDownloadProgress: (progressEvent) => {
             if (progressEvent.total) {
-              const percentage = Math.round(
-                (progressEvent.loaded * 100) / progressEvent.total
-              );
-              setProgress(percentage);
+              setProgress(Math.round((progressEvent.loaded * 100) / progressEvent.total));
             }
           },
         }
       );
 
       if (response.data.readme) {
-        setMarkdown(response.data.readme);
-        const extractedSections = extractSections(response.data.readme);
+        const newMarkdown = response.data.readme;
+        setMarkdown(newMarkdown);
+        setFullMarkdown(newMarkdown);
+        const extractedSections = extractSections(newMarkdown);
         setSections(extractedSections);
+        if (extractedSections.length > 0) {
+          setActiveSection(extractedSections[0]);
+          setActiveSectionContent(extractedSections[0].markdown);
+        }
         setShowFileTree(false);
       }
     } catch (error) {
@@ -221,6 +208,18 @@ export function EditorView({ repoUrl, markdown, setMarkdown }: EditorViewProps) 
     }
   }, [repoUrl]);
 
+  useEffect(() => {
+    if (markdown && sections.length === 0) {
+      const extractedSections = extractSections(markdown);
+      setSections(extractedSections);
+      setFullMarkdown(markdown);
+      if (extractedSections.length > 0) {
+        setActiveSection(extractedSections[0]);
+        setActiveSectionContent(extractedSections[0].markdown);
+      }
+    }
+  }, [markdown]);
+
   return (
     <div className="h-full flex flex-col">
       {loading && (
@@ -229,11 +228,7 @@ export function EditorView({ repoUrl, markdown, setMarkdown }: EditorViewProps) 
             <h2 className="text-xl font-bold text-white">
               {showFileTree ? "Loading Files..." : "Generating README..."}
             </h2>
-            <progress
-              value={progress}
-              max="100"
-              className="w-64 h-2 bg-gray-300 rounded"
-            ></progress>
+            <progress value={progress} max="100" className="w-64 h-2 bg-gray-300 rounded" />
             <p className="text-white">{progress}%</p>
           </div>
         </div>
@@ -253,20 +248,23 @@ export function EditorView({ repoUrl, markdown, setMarkdown }: EditorViewProps) 
           <div className="w-[20%] overflow-auto !block">
             <SectionsColumn
               sections={sections}
+              activeSection={activeSection}
+              onSectionSelect={handleSectionSelect}
               onSectionsChange={handleSectionsChange}
               repoUrl={repoUrl}
-              currentMarkdown={markdown}
+              currentMarkdown={fullMarkdown}
             />
           </div>
           <div className="w-[40%] h-full overflow-hidden border-r border-border">
             <MarkdownEditor
-              value={markdown}
+              value={activeSectionContent}
               onChange={handleMarkdownChange}
+              editorRef={editorRef}
             />
           </div>
           <div className="w-[40%] h-full flex flex-col overflow-hidden">
             <div className="h-[60%] min-h-0 border-b border-border overflow-hidden">
-              <MarkdownViewer markdown={previewMarkdown} />
+              <MarkdownViewer markdown={fullMarkdown} />
             </div>
             <div className="h-[40%] min-h-0 overflow-hidden">
               <ChatWithGemini />

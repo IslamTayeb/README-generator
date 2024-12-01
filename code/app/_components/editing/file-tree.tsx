@@ -92,7 +92,7 @@ export function FileTree({
 
   const [searchTerm, setSearchTerm] = React.useState("");
   const [isClosing, setIsClosing] = React.useState(false);
-  const { toast } = useToast();
+  // const { toast } = useToast();
 
   // Convert flat file list to tree structure
   const createFileTree = (files: FileTreeItem[]): Record<string, TreeNode> => {
@@ -188,13 +188,13 @@ export function FileTree({
       return node && node.type === "blob";
     }).length;
 
-    if (selectedCount > MAX_FILES) {
-      toast({
-        title: "Warning",
-        description: `You've selected more than ${MAX_FILES} files. This may impact performance.`,
-        variant: "destructive",
-      });
-    }
+    // if (selectedCount > MAX_FILES) {
+    //   toast({
+    //     title: "Warning",
+    //     description: `You've selected more than ${MAX_FILES} files. This may impact performance.`,
+    //     variant: "destructive",
+    //   });
+    // }
   };
 
   const getNodeState = (

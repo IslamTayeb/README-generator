@@ -2,13 +2,21 @@
 
 import React from 'react';
 import MonacoEditor from '@monaco-editor/react';
+import { editor } from 'monaco-editor';
 
 interface MarkdownEditorProps {
   value: string;
   onChange: (value: string) => void;
+  editorRef?: React.MutableRefObject<editor.IStandaloneCodeEditor | null>;
 }
 
-export function MarkdownEditor({ value, onChange }: MarkdownEditorProps) {
+export function MarkdownEditor({ value, onChange, editorRef }: MarkdownEditorProps) {
+  const handleEditorDidMount = (editor: editor.IStandaloneCodeEditor) => {
+    if (editorRef) {
+      editorRef.current = editor;
+    }
+  };
+
   return (
     <div className="h-full flex flex-col">
       <h2 className="text-xl font-bold p-4 text-foreground border-b bg-card">
@@ -20,6 +28,7 @@ export function MarkdownEditor({ value, onChange }: MarkdownEditorProps) {
           defaultLanguage="markdown"
           value={value}
           onChange={(value) => onChange(value || '')}
+          onMount={handleEditorDidMount}
           theme="vs-dark"
           options={{
             minimap: { enabled: false },

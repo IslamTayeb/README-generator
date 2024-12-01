@@ -1,7 +1,15 @@
 import React from 'react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, X } from 'lucide-react'
+import { GripVertical, MoreVertical } from 'lucide-react'
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { cn } from "@/lib/utils"
 
 interface SortableItemProps {
   id: string
@@ -9,17 +17,17 @@ interface SortableItemProps {
     name: string
     slug: string
   }
-  focusedSectionSlug: string | null
-  setFocusedSectionSlug: (slug: string) => void
-  onDeleteSection: (slug: string) => void
+  isActive: boolean
+  onSelect: () => void
+  onDelete: () => void
 }
 
 export const SortableItem: React.FC<SortableItemProps> = ({
   id,
   section,
-  focusedSectionSlug,
-  setFocusedSectionSlug,
-  onDeleteSection,
+  isActive,
+  onSelect,
+  onDelete,
 }) => {
   const {
     attributes,
@@ -33,8 +41,6 @@ export const SortableItem: React.FC<SortableItemProps> = ({
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    height: 'auto',
-    minHeight: '40px', // Fixed minimum height for consistency
     zIndex: isDragging ? 50 : 'auto',
   }
 
@@ -43,30 +49,36 @@ export const SortableItem: React.FC<SortableItemProps> = ({
       ref={setNodeRef}
       style={style}
       {...attributes}
-      className={`
-        relative flex items-center py-2 px-3 bg-secondary rounded-md
-        ${focusedSectionSlug === id ? 'ring-2 ring-primary' : ''}
-        ${isDragging ? 'opacity-75 shadow-lg' : 'opacity-100'}
-        mb-2 touch-none
-      `}
+      className={cn(
+        "group relative flex items-center bg-secondary rounded-md hover:bg-secondary/80",
+        isActive && "ring-2 ring-primary",
+        isDragging && "opacity-50"
+      )}
     >
-      <div className="flex items-center justify-between w-[60%] min-w-0">
-        <button
-          className="flex-1 text-left focus:outline-none min-w-0 pr-2"
-          onClick={() => setFocusedSectionSlug(id)}
-        >
-          <span className="block truncate">{section.name}</span>
-        </button>
-        <div className="flex items-center space-x-2 flex-shrink-0">
-          <button
-            className="p-1 hover:bg-background rounded-md focus:outline-none"
-            onClick={() => onDeleteSection(id)}
-          >
-            <X className="w-4 h-4" />
-          </button>
-          <div {...listeners} className="cursor-move touch-none">
-            <GripVertical className="w-4 h-4" />
-          </div>
+      <button
+        className="flex-1 px-4 py-2 text-left focus:outline-none min-w-0"
+        onClick={onSelect}
+      >
+        <span className="block truncate text-sm">{section.name}</span>
+      </button>
+      <div className="flex-none flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon" className="h-7 w-7">
+              <MoreVertical className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-32">
+            <DropdownMenuItem
+              className="text-destructive"
+              onClick={onDelete}
+            >
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+        <div {...listeners} className="cursor-move p-1.5">
+          <GripVertical className="h-4 w-4" />
         </div>
       </div>
     </li>

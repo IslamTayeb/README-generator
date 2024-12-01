@@ -1,5 +1,4 @@
-
-import React, { useState, useRef, useCallback } from "react"
+import React, { useState } from "react"
 import { SectionFilter } from "./section-filter"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -15,20 +14,25 @@ import {
 } from "@/components/ui/dropdown-menu"
 import axios from "axios"
 import { cn } from "@/lib/utils"
+import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
+import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable'
+import { SortableItem } from "./sortable-item"
 
 interface Section {
-  slug: string
-  name: string
-  markdown: string
-  startLine: number
-  endLine: number
+  slug: string;
+  name: string;
+  markdown: string;
+  startLine: number;
+  endLine: number;
 }
 
 interface SectionsColumnProps {
-  sections: Section[]
-  onSectionsChange: (sections: Section[], updatedMarkdown?: string) => void
-  repoUrl: string
-  currentMarkdown: string
+  sections: Section[];
+  activeSection: Section | null;
+  onSectionSelect: (section: Section) => void;
+  onSectionsChange: (sections: Section[], updatedMarkdown?: string) => void;
+  repoUrl: string;
+  currentMarkdown: string;
 }
 
 export const templateSections = [
@@ -42,68 +46,41 @@ export const templateSections = [
   { name: 'Troubleshooting', description: 'Common issues and solutions' },
 ]
 
-export function SectionsColumn({ sections, onSectionsChange, repoUrl, currentMarkdown }: SectionsColumnProps) {
+export function SectionsColumn({
+  sections,
+  activeSection,
+  onSectionSelect,
+  onSectionsChange,
+  repoUrl,
+  currentMarkdown
+}: SectionsColumnProps) {
   const [searchFilter, setSearchFilter] = useState('')
-  const [focusedSectionSlug, setFocusedSectionSlug] = useState<string | null>(null)
   const [newSectionTitle, setNewSectionTitle] = useState('')
   const [newSectionDescription, setNewSectionDescription] = useState('')
   const [isGenerating, setIsGenerating] = useState(false)
-  const [draggedItem, setDraggedItem] = useState<Section | null>(null)
-  const [dropIndicatorIndex, setDropIndicatorIndex] = useState<number | null>(null)
-  const dragOverItem = useRef<string | null>(null)
 
-  const handleDragStart = (e: React.DragEvent<HTMLLIElement>, section: Section) => {
-    setDraggedItem(section)
-    e.dataTransfer.effectAllowed = 'move'
-    e.dataTransfer.setData('text/plain', section.slug)
-    const target = e.target as HTMLElement
-    setTimeout(() => {
-      target.style.opacity = '0.5'
-    }, 0)
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
+
+  const handleDragEnd = (event: any) => {
+    const { active, over } = event
+
+    if (active.id !== over.id) {
+      const oldIndex = sections.findIndex((section) => section.slug === active.id)
+      const newIndex = sections.findIndex((section) => section.slug === over.id)
+
+      const newSections = arrayMove(sections, oldIndex, newIndex)
+      onSectionsChange(newSections)
+    }
   }
-
-  const handleDragOver = useCallback((e: React.DragEvent<HTMLLIElement>, targetSlug: string, index: number) => {
-    e.preventDefault()
-    dragOverItem.current = targetSlug
-    const rect = e.currentTarget.getBoundingClientRect()
-    const midpoint = rect.top + rect.height / 2
-    if (e.clientY < midpoint) {
-      setDropIndicatorIndex(index)
-    } else {
-      setDropIndicatorIndex(index + 1)
-    }
-  }, [])
-
-  const handleDragEnd = (e: React.DragEvent<HTMLLIElement>) => {
-    e.preventDefault();
-    const target = e.target as HTMLElement;
-    target.style.opacity = '1';
-
-    if (draggedItem && dragOverItem.current && draggedItem.slug !== dragOverItem.current) {
-      // Create new sections array with updated order
-      const newSections = [...sections];
-      const draggedIndex = newSections.findIndex(section => section.slug === draggedItem.slug);
-      const targetIndex = newSections.findIndex(section => section.slug === dragOverItem.current);
-
-      // Remove dragged item
-      newSections.splice(draggedIndex, 1);
-
-      // Insert at new position
-      newSections.splice(dropIndicatorIndex as number, 0, draggedItem);
-
-      // Update the markdown and sections only after drag is complete
-      onSectionsChange(newSections);
-    }
-
-    setDraggedItem(null);
-    dragOverItem.current = null;
-    setDropIndicatorIndex(null);
-  };
 
   const onDeleteSection = (sectionSlug: string) => {
     const newSections = sections.filter(s => s.slug !== sectionSlug)
     onSectionsChange(newSections)
-    setFocusedSectionSlug(null)
   }
 
   const handleGenerateNewSection = async () => {
@@ -197,134 +174,99 @@ export function SectionsColumn({ sections, onSectionsChange, repoUrl, currentMar
         <h3 className="text-sm font-medium">Sections</h3>
       </div>
 
-      {/* <ScrollArea > */}
-        <div className="p-3 space-y-4">
+      <div className="p-3 space-y-4">
+        <h4 className="text-xs font-medium text-muted-foreground mb-2">
+          Document Sections
+        </h4>
+        <SectionFilter
+          searchFilter={searchFilter}
+          setSearchFilter={setSearchFilter}
+        />
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={filteredSections.map(section => section.slug)}
+            strategy={verticalListSortingStrategy}
+          >
+            <ul className="space-y-1.5 relative">
+              {filteredSections.map((section) => (
+                <SortableItem
+                  key={section.slug}
+                  id={section.slug}
+                  section={section}
+                  isActive={activeSection?.slug === section.slug}
+                  onSelect={() => onSectionSelect(section)}
+                  onDelete={() => onDeleteSection(section.slug)}
+                />
+              ))}
+            </ul>
+          </SortableContext>
+        </DndContext>
+
+        <Separator />
+
+        <div>
           <h4 className="text-xs font-medium text-muted-foreground mb-2">
-            Document Sections
+            Create Custom Section
           </h4>
-          <SectionFilter
-            searchFilter={searchFilter}
-            setSearchFilter={setSearchFilter}
-          />
-          <ul className="space-y-1.5 relative">
-            {dropIndicatorIndex === 0 && (
-              <div className="absolute top-0 left-0 right-0 h-0.5 bg-primary -translate-y-1/2" />
-            )}
-            {filteredSections.map((section, index) => (
-              <React.Fragment key={section.slug}>
-                <li
-                  draggable
-                  onDragStart={(e) => handleDragStart(e, section)}
-                  onDragOver={(e) => handleDragOver(e, section.slug, index)}
-                  onDragEnd={handleDragEnd}
-                  className={cn(
-                    "group relative flex items-center bg-secondary rounded-md hover:bg-secondary/80",
-                    focusedSectionSlug === section.slug && "ring-2 ring-primary"
-                  )}
-                >
-                  <div className="flex items-center min-w-0 flex-1">
-                    <button
-                      className="flex-1 px-4 py-2 text-left focus:outline-none min-w-0"
-                      onClick={() => setFocusedSectionSlug(section.slug)}
-                    >
-                      <span className="block truncate text-sm">{section.name}</span>
-                    </button>
-                    <div className="flex-none flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7"
-                          >
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-32">
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={() => onDeleteSection(section.slug)}
-                          >
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                      <div className="cursor-move p-1.5">
-                        <GripVertical className="h-4 w-4" />
-                      </div>
-                    </div>
-                  </div>
-                </li>
-                {dropIndicatorIndex === index + 1 && (
-                  <div className="h-0.5 bg-primary w-full" />
-                )}
-              </React.Fragment>
-            ))}
-          </ul>
-
-
-          <Separator />
-
-          <div>
-            <h4 className="text-xs font-medium text-muted-foreground mb-2">
-              Create Custom Section
-            </h4>
-            <div className="space-y-2">
-              <Input
-                placeholder="Section title"
-                value={newSectionTitle}
-                onChange={(e) => setNewSectionTitle(e.target.value)}
-              />
-              <Textarea
-                placeholder="Description (optional)"
-                value={newSectionDescription}
-                onChange={(e) => setNewSectionDescription(e.target.value)}
-                rows={3}
-              />
-              <Button
-                className="w-full"
-                onClick={handleGenerateNewSection}
-                disabled={isGenerating || !newSectionTitle.trim()}
-              >
-                <PlusCircle className="h-4 w-4" />
-                {isGenerating ? 'Generating...' : 'Generate Section'}
-              </Button>
-            </div>
+          <div className="space-y-2">
+            <Input
+              placeholder="Section title"
+              value={newSectionTitle}
+              onChange={(e) => setNewSectionTitle(e.target.value)}
+            />
+            <Textarea
+              placeholder="Description (optional)"
+              value={newSectionDescription}
+              onChange={(e) => setNewSectionDescription(e.target.value)}
+              rows={3}
+            />
+            <Button
+              className="w-full"
+              onClick={handleGenerateNewSection}
+              disabled={isGenerating || !newSectionTitle.trim()}
+            >
+              <PlusCircle className="h-4 w-4 mr-2" />
+              {isGenerating ? 'Generating...' : 'Generate Section'}
+            </Button>
           </div>
+        </div>
 
-          {availableTemplates.length > 0 && (
-            <>
-              <Separator />
-              <div>
-                <h4 className="text-xs font-medium text-muted-foreground mb-2">
-                  Template Sections
-                </h4>
-                <div className="space-y-1.5">
-                  {availableTemplates.map((template) => (
-                    <Button
-                      key={template.name}
-                      variant="secondary"
-                      className="w-full justify-start h-auto py-2"
-                      onClick={() => handleAddTemplateSection(template)}
-                      disabled={isGenerating}
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <BookOpen className="h-4 w-4 flex-none" />
-                        <div className="flex-1 min-w-0 text-left">
-                          <div className="font-medium truncate">{template.name}</div>
-                          <div className="text-xs text-muted-foreground truncate">
-                            {template.description}
-                          </div>
+        {availableTemplates.length > 0 && (
+          <>
+            <Separator />
+            <div>
+              <h4 className="text-xs font-medium text-muted-foreground mb-2">
+                Template Sections
+              </h4>
+              <div className="space-y-1.5">
+                {availableTemplates.map((template) => (
+                  <Button
+                    key={template.name}
+                    variant="secondary"
+                    className="w-full justify-start h-auto py-2"
+                    onClick={() => handleAddTemplateSection(template)}
+                    disabled={isGenerating}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <BookOpen className="h-4 w-4 flex-none" />
+                      <div className="flex-1 min-w-0 text-left">
+                        <div className="font-medium truncate">{template.name}</div>
+                        <div className="text-xs text-muted-foreground truncate">
+                          {template.description}
                         </div>
                       </div>
-                    </Button>
-                  ))}
-                </div>
+                    </div>
+                  </Button>
+                ))}
               </div>
-            </>
-          )}
-        </div>
-      {/* </ScrollArea> */}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   )
 }

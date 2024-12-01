@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/dialog";
 import { AppSidebar } from "@/app/_components/app-sidebar";
 import { useToast } from "@/hooks/use-toast";
+import { useSidebar } from "@/components/ui/sidebar"
 
 interface Project {
   id: string;
@@ -30,9 +31,14 @@ export default function Dashboard() {
   const [repoUrl, setRepoUrl] = React.useState("");
   const [isEditorMode, setIsEditorMode] = React.useState(false);
   const [repositories, setRepositories] = React.useState<Project[]>([]);
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
+  // const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [markdown, setMarkdown] = React.useState("");
+  // const { setOpen } = useSidebar();
+  const [manualToggle, setManualToggle] = React.useState(false);
+  const [sidebarOpen, setSidebarOpen] = React.useState(true);
+
+
 
   // GitHub Authentication Handler
   const handleGithubAuth = () => {
@@ -84,17 +90,6 @@ export default function Dashboard() {
   React.useEffect(() => {
     verifyAuthentication();
   }, []);
-
-  const navigateToLandingPage = () => {
-    setIsEditorMode(false);
-    setRepoUrl("");
-  };
-
-  const handleNavigateToEditor = (repoUrl: string) => {
-    setRepoUrl(repoUrl);
-    setIsEditorMode(true);
-    setIsSidebarCollapsed(true);
-  };
 
   const handleSubmit = async () => {
     console.log("Submit clicked");
@@ -149,18 +144,44 @@ export default function Dashboard() {
     }
   };
 
+  const handleNavigateToEditor = (repoUrl: string) => {
+    setRepoUrl(repoUrl);
+    setIsEditorMode(true);
+    setSidebarOpen(false); // Force close when entering editor
+  };
+
+  const navigateToLandingPage = () => {
+    setIsEditorMode(false);
+    setRepoUrl("");
+    setSidebarOpen(true); // Force open when entering landing
+  };
+
+  // Create handler for sidebar toggle
+  const handleSidebarToggle = () => {
+    setManualToggle(!manualToggle);
+  };
+
+
+
+
   return (
-    <div className="flex w-full h-screen bg-background text-foreground overflow-hidden">
-      <SidebarProvider>
+
+    <div
+      className="flex w-full h-screen bg-background text-foreground overflow-hidden"
+      data-editor-mode={isEditorMode}
+    >
+      <SidebarProvider
+        open={sidebarOpen}
+        onOpenChange={setSidebarOpen}
+      >
         <AppSidebar
           isAuthenticated={isAuthenticated}
           projects={repositories.length ? repositories : []}
           onNewProject={navigateToLandingPage}
           onAuthenticate={handleGithubAuth}
           onNavigateToEditor={handleNavigateToEditor}
-          collapsed={isSidebarCollapsed}
+          isEditorMode={isEditorMode}
         />
-
         <main className="flex flex-col flex-1 h-full overflow-hidden">
           <header className="flex items-center border-b border-border px-6 py-4 bg-card">
             <div className="flex-1 flex items-center">
