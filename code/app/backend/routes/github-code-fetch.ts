@@ -107,12 +107,12 @@ const extractPdfContent = async (buffer: Buffer): Promise<string> => {
 // Function to determine if a file should be included
 const shouldIncludeFile = (filePath: string, size: number): boolean => {
   const ignoredExtensions = [
-    '.csv', '.json', '.tsv', '.xls', '.xlsx', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.mp4', '.avi', '.mkv', '.mov', '.webm', '.wmv', '.mp3', '.wav', '.flac', '.log', '.DS_Store', '.zip', '.gz', '.tar', '.7z'
+    '.csv', '.json', '.tsv', '.xls', '.xlsx', '.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.mp4', '.avi', '.mkv', '.mov', '.webm', '.wmv', '.mp3', '.wav', '.flac', '.log', '.DS_Store', '.zip', '.gz', '.tar', '.7z', '.rar', '.mjs', '.ts', '.ico', '.txt'
   ];
   const ignoredDirectories = [
-    'node_modules/', 'dist/', 'venv/', 'env/', '.git/', '.vscode/', '.gitignore', '.env', '.gitattributes', '.python-version', '.venv', 'yarn.lock', 'package-lock.json'
+    'node_modules/', 'dist/', 'venv/', 'env/', '.git/', '.vscode/', '.gitignore', '.env', '.gitattributes', '.python-version', '.venv', 'yarn.lock', 'package-lock.json', 'hooks', '.next',
   ];
-  const maxFileSize = 10000000;
+  const maxFileSize = 1000000;
 
   if (ignoredExtensions.some(ext => filePath.endsWith(ext))) {
     console.log(`File excluded based on extension: ${filePath}`);

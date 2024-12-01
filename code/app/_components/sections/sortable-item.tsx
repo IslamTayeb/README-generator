@@ -79,7 +79,9 @@ const SortableItem = ({
               currentName={section.name}
               onRename={onRename}
             >
-              <DropdownMenuItem>Rename</DropdownMenuItem>
+              <DropdownMenuItem>
+                Rename
+              </DropdownMenuItem>
             </RenameDialog>
             <DropdownMenuItem
               className="text-destructive"
