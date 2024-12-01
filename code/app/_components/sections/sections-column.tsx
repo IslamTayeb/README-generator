@@ -16,9 +16,9 @@ import axios from "axios"
 import { cn } from "@/lib/utils"
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable'
-import { SortableItem } from "./sortable-item"
+import SortableItem from './sortable-item'
 
-interface Section {
+export interface Section {
   slug: string;
   name: string;
   markdown: string;
@@ -168,6 +168,31 @@ export function SectionsColumn({
     )
   )
 
+  const handleRenameSection = (section: Section, newName: string) => {
+    const updatedSection = {
+      ...section,
+      name: newName,
+      slug: `section-${newName.toLowerCase().replace(/[^\w]+/g, '-')}`,
+    };
+
+    const newSections = sections.map(s =>
+      s.slug === section.slug ? updatedSection : s
+    );
+
+    // Check if the new name conflicts with template sections
+    const isTemplateSection = templateSections.some(
+      template => template.name.toLowerCase() === newName.toLowerCase()
+    );
+
+    // If renamed to match a template section, mark that template as used
+    if (isTemplateSection) {
+      const updatedMarkdown = newSections.map(section => section.markdown).join('\n\n');
+      onSectionsChange(newSections, updatedMarkdown);
+    } else {
+      onSectionsChange(newSections);
+    }
+  };
+
   return (
     <div className="flex flex-col h-full border-r border-border bg-card w-full">
       <div className="flex-none p-3 border-b">
@@ -195,11 +220,11 @@ export function SectionsColumn({
               {filteredSections.map((section) => (
                 <SortableItem
                   key={section.slug}
-                  id={section.slug}
                   section={section}
                   isActive={activeSection?.slug === section.slug}
                   onSelect={() => onSectionSelect(section)}
                   onDelete={() => onDeleteSection(section.slug)}
+                  onRename={(newName) => handleRenameSection(section, newName)}
                 />
               ))}
             </ul>

@@ -1,34 +1,42 @@
-import React from 'react'
-import { useSortable } from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
-import { GripVertical, MoreVertical } from 'lucide-react'
-import { Button } from "@/components/ui/button"
+"use client";
+
+import React from "react";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { GripVertical, MoreVertical } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { cn } from "@/lib/utils"
+} from "@/components/ui/dropdown-menu";
+import { cn } from "@/lib/utils";
+import RenameDialog from "./rename-dialog";
 
-interface SortableItemProps {
-  id: string
-  section: {
-    name: string
-    slug: string
-  }
-  isActive: boolean
-  onSelect: () => void
-  onDelete: () => void
+export interface Section {
+  slug: string;
+  name: string;
+  markdown: string;
+  startLine: number;
+  endLine: number;
 }
 
-export const SortableItem: React.FC<SortableItemProps> = ({
-  id,
+interface SortableItemProps {
+  section: Section;
+  isActive: boolean;
+  onSelect: () => void;
+  onDelete: () => void;
+  onRename: (newName: string) => void;
+}
+
+const SortableItem = ({
   section,
   isActive,
   onSelect,
   onDelete,
-}) => {
+  onRename,
+}: SortableItemProps) => {
   const {
     attributes,
     listeners,
@@ -36,19 +44,17 @@ export const SortableItem: React.FC<SortableItemProps> = ({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: id })
+  } = useSortable({ id: section.slug });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-    zIndex: isDragging ? 50 : 'auto',
-  }
+  };
 
   return (
     <li
       ref={setNodeRef}
       style={style}
-      {...attributes}
       className={cn(
         "group relative flex items-center bg-secondary rounded-md hover:bg-secondary/80",
         isActive && "ring-2 ring-primary",
@@ -69,6 +75,12 @@ export const SortableItem: React.FC<SortableItemProps> = ({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-32">
+            <RenameDialog
+              currentName={section.name}
+              onRename={onRename}
+            >
+              <DropdownMenuItem>Rename</DropdownMenuItem>
+            </RenameDialog>
             <DropdownMenuItem
               className="text-destructive"
               onClick={onDelete}
@@ -77,10 +89,12 @@ export const SortableItem: React.FC<SortableItemProps> = ({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
-        <div {...listeners} className="cursor-move p-1.5">
+        <div className="cursor-move p-1.5" {...attributes} {...listeners}>
           <GripVertical className="h-4 w-4" />
         </div>
       </div>
     </li>
-  )
-}
+  );
+};
+
+export default SortableItem;
