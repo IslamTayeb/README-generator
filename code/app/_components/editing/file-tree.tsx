@@ -10,6 +10,8 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 interface FileTreeItem {
   path: string;
@@ -20,14 +22,19 @@ interface FileTreeItem {
   url: string;
 }
 
+interface FileSelectionParams {
+  selectedFiles: string[];
+  selectedDirectories: string[];
+  projectContext: string;
+}
+
 interface FileTreeProps {
   files: FileTreeItem[];
-  onNext: (selectedFiles: string[], selectedDirectories: string[]) => void;
+  onNext: (params: FileSelectionParams) => void;  // Change this line
   preCheckedFiles?: string[];
   onClose: () => void;
   autoCollapse?: boolean;
 }
-
 interface TreeNode {
   isFile: boolean;
   type: string;
@@ -355,6 +362,9 @@ export function FileTree({
     return node && node.type === "blob";
   }).length;
 
+  const [projectContext, setProjectContext] = React.useState("");
+  const [isContextDialogOpen, setIsContextDialogOpen] = React.useState(false);
+
   const handleNext = () => {
     setIsClosing(true);
     setTimeout(() => {
@@ -366,7 +376,11 @@ export function FileTree({
         const node = files.find((file) => file.path === path);
         return node && node.type !== "blob";
       });
-      onNext(selectedFilesList, selectedDirectories);
+      onNext({
+        selectedFiles: selectedFilesList,
+        selectedDirectories,
+        projectContext
+      });
       onClose();
     }, 300);
   };
@@ -442,12 +456,42 @@ export function FileTree({
                   <span className="text-sm text-muted-foreground">
                     {selectedCount} file{selectedCount !== 1 ? "s" : ""} selected
                   </span>
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsContextDialogOpen(true)}
+                  >
+                    Add Context
+                  </Button>
                   <Button onClick={handleNext} disabled={selectedCount > MAX_FILES}>
                     Next
                   </Button>
                 </div>
               </div>
-            </div>
+            </div>            <Dialog open={isContextDialogOpen} onOpenChange={setIsContextDialogOpen}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add Project Context</DialogTitle>
+                  <DialogDescription>
+                    Provide additional context about your project to help generate better documentation.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                  <Textarea
+                    value={projectContext}
+                    onChange={(e) => setProjectContext(e.target.value)}
+                    placeholder="Example: This project was created for DataFest 2024. It's a data visualization tool that helps analyze climate change patterns..."
+                    className="min-h-[150px]"
+                  />
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsContextDialogOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button onClick={() => setIsContextDialogOpen(false)}>Save Context</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+
           </Card>
         </motion.div>
       )}

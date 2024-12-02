@@ -9,6 +9,7 @@ import { SectionsColumn } from "./sections/sections-column"
 import axios from "axios"
 import { debounce } from 'lodash';
 import { editor } from "monaco-editor"
+import LoadingIndicator from "./editing/loading-indicator"
 
 interface FileTreeItem {
   path: string;
@@ -33,6 +34,12 @@ interface EditorViewProps {
   setMarkdown: (markdown: string) => void;
 }
 
+interface FileSelectionParams {
+  selectedFiles: string[];
+  selectedDirectories: string[];
+  projectContext: string;
+}
+
 export function EditorView({ repoUrl, markdown, setMarkdown }: EditorViewProps) {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -44,6 +51,11 @@ export function EditorView({ repoUrl, markdown, setMarkdown }: EditorViewProps) 
   const [activeSectionContent, setActiveSectionContent] = useState('');
   const [fullMarkdown, setFullMarkdown] = useState(markdown);
   const editorRef = React.useRef<editor.IStandaloneCodeEditor | null>(null);
+  const [loadingMessages, setLoadingMessages] = useState<string[]>([]);
+  const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
+  const [tokenCount, setTokenCount] = useState<number>(0);
+  const [isComplete, setIsComplete] = useState(false);
+
 
   const extractSections = (content: string): Section[] => {
     const lines = content.split('\n');
@@ -145,6 +157,20 @@ export function EditorView({ repoUrl, markdown, setMarkdown }: EditorViewProps) 
   const fetchRepositoryTree = async () => {
     try {
       setLoading(true);
+      setLoadingMessages([
+        "Connecting to repository...",
+        "Fetching file structure...",
+        "Analyzing repository contents..."
+      ]);
+
+      let messageIndex = 0;
+      const messageInterval = setInterval(() => {
+        setCurrentMessageIndex(prev => {
+          messageIndex = (prev + 1) % loadingMessages.length;
+          return messageIndex;
+        });
+      }, 3000);
+
       const encodedRepoUrl = encodeURIComponent(repoUrl);
       const response = await axios.get(
         `http://localhost:3001/api/github/fetch-tree?repoUrl=${encodedRepoUrl}`,
@@ -154,6 +180,8 @@ export function EditorView({ repoUrl, markdown, setMarkdown }: EditorViewProps) 
         }
       );
 
+      clearInterval(messageInterval);
+
       if (response.data.files && response.data.preSelectedFiles) {
         setFiles(response.data.files);
         setPreSelectedFiles(response.data.preSelectedFiles);
@@ -162,43 +190,69 @@ export function EditorView({ repoUrl, markdown, setMarkdown }: EditorViewProps) 
       console.error("Failed to fetch repository tree:", error);
     } finally {
       setLoading(false);
+      setLoadingMessages([]);
+      setCurrentMessageIndex(0);
     }
   };
 
-  const handleFileSelection = async (selectedFiles: string[], selectedDirectories: string[]) => {
+  const handleFileSelection = async ({ selectedFiles, selectedDirectories, projectContext }: FileSelectionParams) => {
     try {
       setLoading(true);
+      setTokenCount(0); // Reset token count
       const encodedRepoUrl = encodeURIComponent(repoUrl);
+
+      setLoadingMessages(["Starting process..."]);
+      setCurrentMessageIndex(0);
+
       const response = await axios.post(
         "http://localhost:3001/api/github/generate-readme",
-        { repoUrl: encodedRepoUrl, selectedFiles },
+        {
+          repoUrl: encodedRepoUrl,
+          selectedFiles,
+          projectContext
+        },
         {
           withCredentials: true,
           onDownloadProgress: (progressEvent) => {
-            if (progressEvent.total) {
-              setProgress(Math.round((progressEvent.loaded * 100) / progressEvent.total));
-            }
+            const content = progressEvent.event.target.responseText;
+            const lines = content.split('\n').filter(Boolean);
+
+            // Process all lines to get the latest state
+            lines.forEach((line: string) => {  // Added type here
+              try {
+                const update = JSON.parse(line);
+                if (update.status === 'complete') {
+                  // Fade out animation
+                  setTimeout(() => {
+                    setMarkdown(update.readme);
+                    setFullMarkdown(update.readme);
+                    const extractedSections = extractSections(update.readme);
+                    setSections(extractedSections);
+                    if (extractedSections.length > 0) {
+                      setActiveSection(extractedSections[0]);
+                      setActiveSectionContent(extractedSections[0].markdown);
+                    }
+                    setShowFileTree(false);
+                    setLoading(false);
+                  }, 200); // Match the exit animation duration
+                } else if (update.status === 'error') {
+                  throw new Error(update.message);
+                } else {
+                  setLoadingMessages([update.message]);
+                  if (update.tokenCount) {
+                    setTokenCount(update.tokenCount);
+                  }
+                }
+              } catch (e) {
+                console.error('Error parsing update:', e);
+              }
+            });
           },
         }
       );
-
-      if (response.data.readme) {
-        const newMarkdown = response.data.readme;
-        setMarkdown(newMarkdown);
-        setFullMarkdown(newMarkdown);
-        const extractedSections = extractSections(newMarkdown);
-        setSections(extractedSections);
-        if (extractedSections.length > 0) {
-          setActiveSection(extractedSections[0]);
-          setActiveSectionContent(extractedSections[0].markdown);
-        }
-        setShowFileTree(false);
-      }
     } catch (error) {
       console.error("Failed to generate README:", error);
-    } finally {
       setLoading(false);
-      setProgress(100);
     }
   };
 
@@ -223,23 +277,18 @@ export function EditorView({ repoUrl, markdown, setMarkdown }: EditorViewProps) 
   return (
     <div className="h-full flex flex-col">
       {loading && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-75">
-          <div className="flex flex-col items-center space-y-4">
-            <h2 className="text-xl font-bold text-white">
-              {showFileTree ? "Loading Files..." : "Generating README..."}
-            </h2>
-            <progress value={progress} max="100" className="w-64 h-2 bg-gray-300 rounded" />
-            <p className="text-white">{progress}%</p>
-          </div>
-        </div>
-      )}
-
-      {showFileTree ? (
+        <LoadingIndicator
+          messages={loadingMessages}
+          currentIndex={currentMessageIndex}
+          tokenCount={tokenCount}
+          isComplete={isComplete}
+        />
+      )}      {showFileTree ? (
         <div className="flex-1 flex justify-center items-center p-4 overflow-auto">
           <FileTree
             files={files}
             preCheckedFiles={preSelectedFiles}
-            onNext={handleFileSelection}
+            onNext={handleFileSelection} // This will now work since types match
             onClose={() => setShowFileTree(false)}
           />
         </div>

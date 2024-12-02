@@ -252,9 +252,18 @@ const retryGemini = async (prompt: string, retries: number = 5, interval: number
   return null;
 };
 
-const createFullPrompt = (filesContent: string): string => {
+const createFullPrompt = (filesContent: string, projectContext?: string): string => {
+  let contextPrompt = '';
+  if (projectContext) {
+    contextPrompt = `
+Additional Project Context:
+${projectContext}
+
+`;
+  }
+
   return `You are an AI assistant that creates detailed and technical README.md files for software projects.
-Here is the full codebase to analyze:
+${contextPrompt}Here is the full codebase to analyze:
 
 ${filesContent}
 
@@ -266,17 +275,17 @@ Based on the code above, generate a comprehensive README.md that includes:
 5. Dependencies
 6. How to Contribute
 
+${projectContext ? 'Make sure to incorporate the provided project context into the documentation where relevant.' : ''}
 Format the response in proper Markdown with clear sections, code blocks where appropriate, and detailed explanations.`;
 };
 
-// Endpoint to generate README from selected files
+// Change 2: Update the /generate-readme endpoint parameters
 router.post('/generate-readme', async (req: Request, res: Response): Promise<void> => {
   try {
-    const { repoUrl, selectedFiles, truncateNotebookOutputs = true } = req.body;  // Add truncateNotebookOutputs parameter
-    if (!repoUrl || !selectedFiles) {
-      res.status(400).json({ error: 'Missing required parameters' });
-      return;
-    }
+    const { repoUrl, selectedFiles, projectContext, truncateNotebookOutputs = true } = req.body;
+    // Set headers for streaming
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Transfer-Encoding', 'chunked');
 
     const accessToken = req.session?.accessToken;
     if (!accessToken) {
@@ -286,6 +295,9 @@ router.post('/generate-readme', async (req: Request, res: Response): Promise<voi
 
     const [owner, repo] = decodeURIComponent(repoUrl).replace('https://github.com/', '').split('/');
 
+    // Send initial status
+    res.write(JSON.stringify({ status: 'fetching', message: 'Fetching codebase content...' }) + '\n');
+
     let filesContent = '';
     for (const filePath of selectedFiles) {
       try {
@@ -294,59 +306,66 @@ router.post('/generate-readme', async (req: Request, res: Response): Promise<voi
 
         if (fileNode) {
           let content = await fetchFileContent(owner, repo, fileNode.sha, accessToken);
-
           if (filePath.endsWith('.ipynb')) {
             content = convertIpynbToMarkdown(content, truncateNotebookOutputs);
           }
-
-          filesContent += `
-=== File: ${filePath} ===
-Type: ${fileNode.type}
-Size: ${fileNode.size} bytes
-SHA: ${fileNode.sha}
-
-${content}
-
-`;
+          filesContent += `=== File: ${filePath} ===\n${content}\n\n`;
         }
       } catch (err) {
         console.warn(`Failed to fetch content for file ${filePath}:`, err);
       }
     }
 
-    // Create the full prompt
-    const fullPrompt = createFullPrompt(filesContent);
+    // Send analyzing status
+    res.write(JSON.stringify({ status: 'analyzing', message: 'Analyzing codebase...' }) + '\n');
 
-    // Calculate token count and log it
+    const fullPrompt = createFullPrompt(filesContent, projectContext);
     const tokenEstimate = countTokens(fullPrompt);
-    console.log(`Token count: ${tokenEstimate}`);
 
-    // Save the prompt to a file
-    await savePromptToFile(fullPrompt);
+    // Send token count
+    res.write(JSON.stringify({
+      status: 'tokens',
+      message: `Token count: ${tokenEstimate.toLocaleString()} tokens`,
+      tokenCount: tokenEstimate  // Add this line to send the raw number
+    }) + '\n');
 
-    // Check token limit
-    if (tokenEstimate > 900000) {
-      res.status(413).json({
-        error: 'Token limit exceeded',
-        message: 'Please select fewer files. The current selection exceeds the 500,000 token limit.',
-        tokenCount: tokenEstimate
-      });
+    if (tokenEstimate > 500000) {
+      res.write(JSON.stringify({
+        status: 'error',
+        message: 'Token limit exceeded. Please select fewer files.'
+      }) + '\n');
+      res.end();
       return;
     }
 
-    // Attempt to generate README up to 5 times if it fails
+    // Send generating status
+    res.write(JSON.stringify({ status: 'generating', message: 'Generating README...' }) + '\n');
+
     const readmeContent = await retryGemini(fullPrompt);
 
     if (!readmeContent) {
-      res.status(500).json({ error: 'Failed to generate README content after multiple attempts.' });
+      res.write(JSON.stringify({
+        status: 'error',
+        message: 'Failed to generate README content.'
+      }) + '\n');
+      res.end();
       return;
     }
 
-    res.json({ readme: readmeContent });
+    // Send final response
+    res.write(JSON.stringify({
+      status: 'complete',
+      readme: readmeContent
+    }) + '\n');
+    res.end();
 
   } catch (error) {
     console.error('Error generating README:', error);
-    res.status(500).json({ error: 'Failed to generate README' });
+    res.write(JSON.stringify({
+      status: 'error',
+      message: 'Failed to generate README'
+    }) + '\n');
+    res.end();
   }
 });
 
