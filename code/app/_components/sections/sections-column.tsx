@@ -195,8 +195,8 @@ export function SectionsColumn({
         <h3 className="">Sections</h3>
       </div> */}
 
-      <div className="p-3 space-y-4 overflow-auto">
-        <h4 className="text-sm font-medium text-muted-foreground my-2">
+      <div className="p-3 py-4 space-y-4 overflow-auto">
+        <h4 className="text-sm font-medium text-muted-foreground mb-4">
           Document Sections
         </h4>
         <SectionFilter
@@ -230,7 +230,7 @@ export function SectionsColumn({
         <Separator />
 
         <div>
-          <h4 className="text-sm font-medium text-muted-foreground my-2">
+          <h4 className="text-sm font-medium text-muted-foreground mb-4">
             Create Custom Section
           </h4>
           <div className="space-y-2">
@@ -264,7 +264,7 @@ export function SectionsColumn({
           <>
             <Separator className="" />
             <div>
-            <h4 className="text-sm font-medium text-muted-foreground my-2">
+            <h4 className="text-sm font-medium text-muted-foreground mb-4">
             Template Sections
               </h4>
               <div className="space-y-1.5">

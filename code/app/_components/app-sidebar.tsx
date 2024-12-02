@@ -56,7 +56,7 @@ function SidebarContents({
       <Sidebar
         collapsible="icon"
         className={cn(
-          "bg-card flex flex-col",
+          "bg-card flex flex-col ",
           isEditorMode ? "data-[state=collapsed]" : ""
         )}
       >

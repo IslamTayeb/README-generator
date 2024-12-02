@@ -167,7 +167,7 @@ export default function Dashboard() {
   return (
 
     <div
-      className="flex w-full h-screen bg-background text-foreground overflow-hidden"
+      className="flex h-screen bg-background text-foreground overflow-hidden"
       data-editor-mode={isEditorMode}
     >
       <SidebarProvider
@@ -184,7 +184,7 @@ export default function Dashboard() {
         />
         <main className="flex flex-col flex-1 h-full overflow-hidden">
           <header className="flex items-center border-b border-border px-6 py-4 bg-card">
-            <div className="flex-1 flex items-center">
+            <div className="flex-1 flex items-center ">
               <SidebarTrigger>
                 <Menu className="h-6 w-6 text-foreground" />
               </SidebarTrigger>
